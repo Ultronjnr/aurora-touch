@@ -14,16 +14,237 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      handshakes: {
+        Row: {
+          amount: number
+          auto_payback: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          days_late: number | null
+          id: string
+          late_fee: number | null
+          payback_day: string
+          requester_id: string
+          status: string | null
+          supporter_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          auto_payback?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          days_late?: number | null
+          id?: string
+          late_fee?: number | null
+          payback_day: string
+          requester_id: string
+          status?: string | null
+          supporter_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          auto_payback?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          days_late?: number | null
+          id?: string
+          late_fee?: number | null
+          payback_day?: string
+          requester_id?: string
+          status?: string | null
+          supporter_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handshakes_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handshakes_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          handshake_id: string | null
+          id: string
+          message: string
+          read: boolean | null
+          sent_at: string | null
+          type: string | null
+          user_id: string
+        }
+        Insert: {
+          handshake_id?: string | null
+          id?: string
+          message: string
+          read?: boolean | null
+          sent_at?: string | null
+          type?: string | null
+          user_id: string
+        }
+        Update: {
+          handshake_id?: string | null
+          id?: string
+          message?: string
+          read?: boolean | null
+          sent_at?: string | null
+          type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_handshake_id_fkey"
+            columns: ["handshake_id"]
+            isOneToOne: false
+            referencedRelation: "handshakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          handshake_id: string
+          id: string
+          payment_method: string | null
+          payment_status: string | null
+          transaction_reference: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          handshake_id: string
+          id?: string
+          payment_method?: string | null
+          payment_status?: string | null
+          transaction_reference?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          handshake_id?: string
+          id?: string
+          payment_method?: string | null
+          payment_status?: string | null
+          transaction_reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_handshake_id_fkey"
+            columns: ["handshake_id"]
+            isOneToOne: false
+            referencedRelation: "handshakes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          cash_rating: number | null
+          created_at: string | null
+          full_name: string
+          id: string
+          id_verified: boolean | null
+          phone: string | null
+          subscription_active: boolean | null
+          unique_code: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          cash_rating?: number | null
+          created_at?: string | null
+          full_name: string
+          id: string
+          id_verified?: boolean | null
+          phone?: string | null
+          subscription_active?: boolean | null
+          unique_code: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          cash_rating?: number | null
+          created_at?: string | null
+          full_name?: string
+          id?: string
+          id_verified?: boolean | null
+          phone?: string | null
+          subscription_active?: boolean | null
+          unique_code?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_unique_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      update_cash_rating: {
+        Args: { days_late: number; user_id: string }
+        Returns: number
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "requester" | "supporter"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +371,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["requester", "supporter"],
+    },
   },
 } as const
