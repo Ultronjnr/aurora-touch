@@ -73,21 +73,21 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
       {/* Background elements */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-secondary/20 rounded-full blur-3xl animate-pulse-glow" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute top-0 left-0 w-72 sm:w-96 h-72 sm:h-96 bg-secondary/20 rounded-full blur-3xl animate-pulse-glow" />
+      <div className="pointer-events-none absolute bottom-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-accent/10 rounded-full blur-3xl" />
 
-      <div className="w-full max-w-md z-10 space-y-8 animate-slide-up">
+      <div className="w-full max-w-md sm:max-w-lg z-10 space-y-6 sm:space-y-8 animate-slide-up">
         {/* Logo */}
         <div className="flex justify-center">
-          <img src={logo} alt="CashMe" className="w-32 h-32 object-contain" />
+          <img src={logo} alt="CashMe" className="w-24 h-24 sm:w-32 sm:h-32 object-contain" />
         </div>
 
         {/* Auth card */}
         <GlassCard>
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8 bg-muted/30">
+            <TabsList className="grid w-full grid-cols-2 mb-6 sm:mb-8 bg-muted/30">
               <TabsTrigger value="login" className="data-[state=active]:bg-primary data-[state=active]:text-white">
                 Login
               </TabsTrigger>
@@ -96,8 +96,8 @@ const Auth = () => {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="login" className="space-y-6">
-              <form onSubmit={handleLogin} className="space-y-6">
+            <TabsContent value="login" className="space-y-4 sm:space-y-6">
+              <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -127,18 +127,18 @@ const Auth = () => {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white py-5 sm:py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
                   {loading ? "Logging in..." : "Login to CashMe"}
                 </Button>
               </form>
             </TabsContent>
 
-            <TabsContent value="register" className="space-y-6">
+            <TabsContent value="register" className="space-y-4 sm:space-y-6">
               {/* Role selection */}
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <Label>I want to be a...</Label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   <GlassCard
                     hover
                     onClick={() => setRole("requester")}
@@ -146,7 +146,7 @@ const Auth = () => {
                       role === "requester" ? "border-secondary glow-cyan" : ""
                     }`}
                   >
-                    <UserPlus className="w-8 h-8 mx-auto mb-2 text-secondary" />
+                    <UserPlus className="w-7 h-7 sm:w-8 sm:h-8 mx-auto mb-2 text-secondary" />
                     <div className="font-medium">Requester</div>
                     <div className="text-xs text-foreground/60 mt-1">Need cash support</div>
                   </GlassCard>
@@ -158,14 +158,14 @@ const Auth = () => {
                       role === "supporter" ? "border-secondary glow-cyan" : ""
                     }`}
                   >
-                    <Users className="w-8 h-8 mx-auto mb-2 text-secondary" />
+                    <Users className="w-7 h-7 sm:w-8 sm:h-8 mx-auto mb-2 text-secondary" />
                     <div className="font-medium">Supporter</div>
                     <div className="text-xs text-foreground/60 mt-1">Help others grow</div>
                   </GlassCard>
                 </div>
               </div>
 
-              <form onSubmit={handleRegister} className="space-y-4">
+              <form onSubmit={handleRegister} className="space-y-3 sm:space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
                   <Input
@@ -221,7 +221,7 @@ const Auth = () => {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white py-5 sm:py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
                   {loading ? "Creating Account..." : "Create Account"}
                 </Button>
