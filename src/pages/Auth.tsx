@@ -6,22 +6,70 @@ import { Label } from "@/components/ui/label";
 import { GlassCard } from "@/components/GlassCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPlus, Users } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import logo from "@/assets/cashme-logo.png";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
+  const { toast } = useToast();
   const [role, setRole] = useState<"requester" | "supporter">("requester");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Login form state
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+
+  // Register form state
+  const [registerName, setRegisterName] = useState("");
+  const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPhone, setRegisterPhone] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // For demo purposes, navigate directly to dashboard
-    navigate("/dashboard");
+    setLoading(true);
+
+    const { error } = await signIn(loginEmail, loginPassword);
+
+    if (error) {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+    
+    setLoading(false);
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // For demo purposes, navigate directly to dashboard
-    navigate("/dashboard");
+    setLoading(true);
+
+    const { error } = await signUp(
+      registerEmail,
+      registerPassword,
+      registerName,
+      registerPhone,
+      role
+    );
+
+    if (error) {
+      toast({
+        title: "Registration failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Account created!",
+        description: "Welcome to CashMe",
+      });
+    }
+    
+    setLoading(false);
   };
 
   return (
@@ -57,6 +105,8 @@ const Auth = () => {
                     type="email"
                     placeholder="you@example.com"
                     className="bg-input/50 border-border/50 focus:border-secondary transition-all"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
                     required
                   />
                 </div>
@@ -68,15 +118,18 @@ const Auth = () => {
                     type="password"
                     placeholder="••••••••"
                     className="bg-input/50 border-border/50 focus:border-secondary transition-all"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
                     required
                   />
                 </div>
 
                 <Button
                   type="submit"
+                  disabled={loading}
                   className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
-                  Login to CashMe
+                  {loading ? "Logging in..." : "Login to CashMe"}
                 </Button>
               </form>
             </TabsContent>
@@ -120,6 +173,8 @@ const Auth = () => {
                     type="text"
                     placeholder="John Doe"
                     className="bg-input/50 border-border/50 focus:border-secondary transition-all"
+                    value={registerName}
+                    onChange={(e) => setRegisterName(e.target.value)}
                     required
                   />
                 </div>
@@ -131,6 +186,8 @@ const Auth = () => {
                     type="email"
                     placeholder="you@example.com"
                     className="bg-input/50 border-border/50 focus:border-secondary transition-all"
+                    value={registerEmail}
+                    onChange={(e) => setRegisterEmail(e.target.value)}
                     required
                   />
                 </div>
@@ -142,6 +199,8 @@ const Auth = () => {
                     type="tel"
                     placeholder="+27 XX XXX XXXX"
                     className="bg-input/50 border-border/50 focus:border-secondary transition-all"
+                    value={registerPhone}
+                    onChange={(e) => setRegisterPhone(e.target.value)}
                     required
                   />
                 </div>
@@ -153,15 +212,18 @@ const Auth = () => {
                     type="password"
                     placeholder="••••••••"
                     className="bg-input/50 border-border/50 focus:border-secondary transition-all"
+                    value={registerPassword}
+                    onChange={(e) => setRegisterPassword(e.target.value)}
                     required
                   />
                 </div>
 
                 <Button
                   type="submit"
+                  disabled={loading}
                   className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
-                  Create Account
+                  {loading ? "Creating Account..." : "Create Account"}
                 </Button>
               </form>
             </TabsContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -13,56 +13,97 @@ import {
   AlertCircle,
   Crown
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import logo from "@/assets/cashme-logo.png";
+
+interface Profile {
+  unique_code: string;
+  full_name: string;
+  cash_rating: number;
+  subscription_active: boolean;
+}
 
 interface Handshake {
   id: string;
   amount: number;
-  supporter: string;
-  requester: string;
-  paybackDay: string;
-  status: "pending" | "approved" | "completed" | "overdue";
+  payback_day: string;
+  status: string;
+  auto_payback: boolean;
+  supporter: { full_name: string; unique_code: string };
+  requester: { full_name: string; unique_code: string };
 }
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [cashRating] = useState(750);
-  const [handshakes] = useState<Handshake[]>([
-    {
-      id: "1",
-      amount: 500,
-      supporter: "Sarah M.",
-      requester: "You",
-      paybackDay: "2025-10-15",
-      status: "approved",
-    },
-    {
-      id: "2",
-      amount: 1000,
-      supporter: "Mike T.",
-      requester: "You",
-      paybackDay: "2025-10-20",
-      status: "pending",
-    },
-    {
-      id: "3",
-      amount: 750,
-      supporter: "Lisa K.",
-      requester: "You",
-      paybackDay: "2025-09-28",
-      status: "completed",
-    },
-  ]);
+  const { user, loading: authLoading } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [handshakes, setHandshakes] = useState<Handshake[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+      return;
+    }
+
+    if (user) {
+      fetchProfile();
+      fetchHandshakes();
+    }
+  }, [user, authLoading]);
+
+  const fetchProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('unique_code, full_name, cash_rating, subscription_active')
+        .eq('id', user?.id)
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+    } catch (error: any) {
+      toast.error("Error loading profile");
+    }
+  };
+
+  const fetchHandshakes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('handshakes')
+        .select(`
+          id,
+          amount,
+          payback_day,
+          status,
+          auto_payback,
+          supporter:supporter_id(full_name, unique_code),
+          requester:requester_id(full_name, unique_code)
+        `)
+        .or(`requester_id.eq.${user?.id},supporter_id.eq.${user?.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setHandshakes(data as any || []);
+    } catch (error: any) {
+      toast.error("Error loading handshakes");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "pending":
         return <Clock className="w-5 h-5 text-yellow-400" />;
       case "approved":
+      case "active":
         return <CheckCircle2 className="w-5 h-5 text-green-400" />;
       case "completed":
         return <CheckCircle2 className="w-5 h-5 text-secondary" />;
-      case "overdue":
+      case "defaulted":
         return <AlertCircle className="w-5 h-5 text-destructive" />;
       default:
         return null;
@@ -74,32 +115,47 @@ const Dashboard = () => {
       case "pending":
         return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
       case "approved":
+      case "active":
         return "bg-green-500/20 text-green-400 border-green-500/30";
       case "completed":
         return "bg-secondary/20 text-secondary border-secondary/30";
-      case "overdue":
+      case "defaulted":
         return "bg-destructive/20 text-destructive border-destructive/30";
       default:
         return "";
     }
   };
 
-  const pending = handshakes.filter((h) => h.status === "pending" || h.status === "approved");
-  const completed = handshakes.filter((h) => h.status === "completed");
+  if (loading || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  const activeHandshakes = handshakes.filter(h => ["pending", "approved", "active"].includes(h.status));
+  const completedHandshakes = handshakes.filter(h => h.status === "completed");
 
   return (
     <div className="min-h-screen p-6 pb-24">
       {/* Header */}
       <header className="flex items-center justify-between mb-8 animate-slide-up">
         <img src={logo} alt="CashMe" className="w-16 h-16" />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/profile")}
-          className="hover:bg-muted/50"
-        >
-          <User className="w-6 h-6" />
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <div className="text-xs text-foreground/60">Your Code</div>
+            <div className="font-mono font-bold text-secondary">{profile?.unique_code}</div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/profile")}
+            className="hover:bg-muted/50"
+          >
+            <User className="w-6 h-6" />
+          </Button>
+        </div>
       </header>
 
       <div className="max-w-md mx-auto space-y-6">
@@ -108,37 +164,43 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm text-foreground/60 mb-1">Your Cash Rating</div>
-              <div className="text-4xl font-bold gradient-text">{cashRating}</div>
+              <div className="text-4xl font-bold gradient-text">
+                {profile?.cash_rating?.toFixed(0) || 100}
+              </div>
             </div>
             <div className="p-4 rounded-full bg-secondary/20">
               <TrendingUp className="w-8 h-8 text-secondary" />
             </div>
           </div>
-          <Progress value={(cashRating / 1000) * 100} className="h-2 mb-2" />
-          <div className="text-xs text-foreground/60">Excellent rating! Keep it up.</div>
-        </GlassCard>
-
-        {/* Premium Banner */}
-        <GlassCard hover className="bg-gradient-to-r from-primary/50 to-secondary/50 border-secondary/30 animate-slide-in-right">
-          <div className="flex items-center gap-4">
-            <Crown className="w-10 h-10 text-secondary" />
-            <div className="flex-1">
-              <div className="font-semibold mb-1">Upgrade to Premium</div>
-              <div className="text-sm text-foreground/70">
-                Enable Auto Payback & advanced analytics
-              </div>
-            </div>
+          <Progress value={((profile?.cash_rating || 100) / 100)} className="h-2 mb-2" />
+          <div className="text-xs text-foreground/60">
+            {(profile?.cash_rating || 100) >= 90 ? "Excellent rating!" : "Keep building your rating"}
           </div>
         </GlassCard>
 
-        {/* Pending Handshakes */}
-        {pending.length > 0 && (
+        {/* Premium Banner */}
+        {!profile?.subscription_active && (
+          <GlassCard hover className="bg-gradient-to-r from-primary/50 to-secondary/50 border-secondary/30 animate-slide-in-right">
+            <div className="flex items-center gap-4">
+              <Crown className="w-10 h-10 text-secondary" />
+              <div className="flex-1">
+                <div className="font-semibold mb-1">Upgrade to Premium</div>
+                <div className="text-sm text-foreground/70">
+                  Enable Auto Payback & advanced analytics
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        )}
+
+        {/* Active Handshakes */}
+        {activeHandshakes.length > 0 && (
           <div className="space-y-4 animate-slide-up" style={{ animationDelay: "0.1s" }}>
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <Calendar className="w-5 h-5 text-secondary" />
               Active Handshakes
             </h2>
-            {pending.map((handshake) => (
+            {activeHandshakes.map((handshake) => (
               <GlassCard
                 key={handshake.id}
                 hover
@@ -154,12 +216,16 @@ const Dashboard = () => {
                 </div>
                 <div className="space-y-2 text-sm text-foreground/70">
                   <div className="flex justify-between">
-                    <span>Supporter:</span>
-                    <span className="font-medium text-foreground">{handshake.supporter}</span>
+                    <span>With:</span>
+                    <span className="font-medium text-foreground">
+                      {handshake.supporter?.full_name} ({handshake.supporter?.unique_code})
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Payback Day:</span>
-                    <span className="font-medium text-foreground">{handshake.paybackDay}</span>
+                    <span className="font-medium text-foreground">
+                      {new Date(handshake.payback_day).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
               </GlassCard>
@@ -168,24 +234,32 @@ const Dashboard = () => {
         )}
 
         {/* Completed Handshakes */}
-        {completed.length > 0 && (
+        {completedHandshakes.length > 0 && (
           <div className="space-y-4 animate-slide-up" style={{ animationDelay: "0.2s" }}>
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-secondary" />
               Completed Handshakes
             </h2>
-            {completed.map((handshake) => (
+            {completedHandshakes.map((handshake) => (
               <GlassCard key={handshake.id} className="opacity-70">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-semibold">R {handshake.amount}</div>
-                    <div className="text-sm text-foreground/60">{handshake.supporter}</div>
+                    <div className="text-sm text-foreground/60">
+                      {handshake.supporter?.full_name} ({handshake.supporter?.unique_code})
+                    </div>
                   </div>
                   <CheckCircle2 className="w-6 h-6 text-secondary" />
                 </div>
               </GlassCard>
             ))}
           </div>
+        )}
+
+        {activeHandshakes.length === 0 && completedHandshakes.length === 0 && (
+          <GlassCard className="text-center py-12">
+            <p className="text-foreground/60">No handshakes yet. Create your first one!</p>
+          </GlassCard>
         )}
       </div>
 

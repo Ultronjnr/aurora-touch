@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/GlassCard";
@@ -9,21 +10,95 @@ import {
   Shield, 
   Crown, 
   Settings,
-  LogOut
+  LogOut,
+  Copy,
+  Check
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface UserProfile {
+  unique_code: string;
+  full_name: string;
+  phone: string;
+  cash_rating: number;
+  subscription_active: boolean;
+  id_verified: boolean;
+}
 
 const Profile = () => {
   const navigate = useNavigate();
+  const { user, signOut, loading: authLoading } = useAuth();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const user = {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+27 82 123 4567",
-    role: "Requester",
-    verified: true,
-    premium: false,
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+      return;
+    }
+
+    if (user) {
+      fetchProfile();
+      fetchRoles();
+    }
+  }, [user, authLoading]);
+
+  const fetchProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+    } catch (error: any) {
+      toast.error("Error loading profile");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const fetchRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      setRoles(data?.map(r => r.role) || []);
+    } catch (error: any) {
+      console.error("Error loading roles");
+    }
+  };
+
+  const copyCode = () => {
+    if (profile?.unique_code) {
+      navigator.clipboard.writeText(profile.unique_code);
+      setCopied(true);
+      toast.success("Unique code copied!");
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+  };
+
+  if (loading || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-6">
@@ -47,19 +122,37 @@ const Profile = () => {
             <div className="relative">
               <Avatar className="w-24 h-24 border-4 border-secondary/50">
                 <AvatarFallback className="text-2xl bg-gradient-to-br from-primary to-secondary text-white">
-                  {user.name.split(" ").map(n => n[0]).join("")}
+                  {profile?.full_name?.split(" ").map(n => n[0]).join("") || "U"}
                 </AvatarFallback>
               </Avatar>
-              {user.verified && (
+              {profile?.id_verified && (
                 <div className="absolute -bottom-2 -right-2 p-2 rounded-full bg-secondary glow-cyan">
                   <Shield className="w-5 h-5 text-white" />
                 </div>
               )}
             </div>
           </div>
-          <h2 className="text-2xl font-bold mb-1">{user.name}</h2>
-          <div className="text-sm text-foreground/60 mb-4">{user.role}</div>
-          {user.verified && (
+          <h2 className="text-2xl font-bold mb-1">{profile?.full_name}</h2>
+          <div className="text-sm text-foreground/60 mb-4 capitalize">
+            {roles.join(", ") || "User"}
+          </div>
+          
+          {/* Unique Code */}
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="font-mono text-2xl font-bold text-secondary">
+              {profile?.unique_code}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={copyCode}
+              className="hover:bg-muted/50"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </Button>
+          </div>
+
+          {profile?.id_verified && (
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/20 text-secondary text-sm">
               <Shield className="w-4 h-4" />
               Quick ID Verified
@@ -67,8 +160,23 @@ const Profile = () => {
           )}
         </GlassCard>
 
+        {/* Cash Rating */}
+        <GlassCard className="animate-slide-in-right">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-foreground/60">Cash Rating</div>
+              <div className="text-3xl font-bold gradient-text">
+                {profile?.cash_rating?.toFixed(0) || 100}
+              </div>
+            </div>
+            <div className="p-3 rounded-full bg-secondary/20">
+              <Shield className="w-8 h-8 text-secondary" />
+            </div>
+          </div>
+        </GlassCard>
+
         {/* Premium Card */}
-        {!user.premium && (
+        {!profile?.subscription_active && (
           <GlassCard 
             hover 
             className="bg-gradient-to-r from-primary/50 to-secondary/50 border-secondary/30 cursor-pointer animate-slide-in-right"
@@ -96,22 +204,24 @@ const Profile = () => {
               </div>
               <div>
                 <div className="text-sm text-foreground/60">Email</div>
-                <div className="font-medium">{user.email}</div>
+                <div className="font-medium">{user?.email}</div>
               </div>
             </div>
           </GlassCard>
 
-          <GlassCard>
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-muted/30">
-                <Phone className="w-5 h-5 text-secondary" />
+          {profile?.phone && (
+            <GlassCard>
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-muted/30">
+                  <Phone className="w-5 h-5 text-secondary" />
+                </div>
+                <div>
+                  <div className="text-sm text-foreground/60">Phone</div>
+                  <div className="font-medium">{profile.phone}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm text-foreground/60">Phone</div>
-                <div className="font-medium">{user.phone}</div>
-              </div>
-            </div>
-          </GlassCard>
+            </GlassCard>
+          )}
 
           <GlassCard>
             <div className="flex items-center gap-4">
@@ -120,7 +230,7 @@ const Profile = () => {
               </div>
               <div>
                 <div className="text-sm text-foreground/60">Account Type</div>
-                <div className="font-medium">{user.role}</div>
+                <div className="font-medium capitalize">{roles.join(", ") || "User"}</div>
               </div>
             </div>
           </GlassCard>
@@ -139,7 +249,7 @@ const Profile = () => {
           <Button
             variant="outline"
             className="w-full justify-start gap-3 border-destructive/50 text-destructive hover:bg-destructive/10 py-6 rounded-xl transition-all"
-            onClick={() => navigate("/auth")}
+            onClick={handleLogout}
           >
             <LogOut className="w-5 h-5" />
             Logout

@@ -1,36 +1,120 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { GlassCard } from "@/components/GlassCard";
-import { ArrowLeft, Calendar as CalendarIcon } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Search } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Profile {
+  id: string;
+  unique_code: string;
+  full_name: string;
+}
 
 const CreateHandshake = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [amount, setAmount] = useState("");
-  const [supporter, setSupporter] = useState("");
+  const [supporterSearch, setSupporterSearch] = useState("");
+  const [selectedSupporter, setSelectedSupporter] = useState<Profile | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [paybackDay, setPaybackDay] = useState<Date>();
   const [autoPayback, setAutoPayback] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading]);
+
+  useEffect(() => {
+    if (supporterSearch.length >= 2) {
+      searchSupporters();
+    } else {
+      setProfiles([]);
+    }
+  }, [supporterSearch]);
+
+  const searchSupporters = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, unique_code, full_name')
+        .neq('id', user?.id)
+        .or(`unique_code.ilike.%${supporterSearch}%,full_name.ilike.%${supporterSearch}%`)
+        .limit(5);
+
+      if (error) throw error;
+      setProfiles(data || []);
+    } catch (error: any) {
+      console.error("Error searching supporters");
+    }
+  };
+
+  const selectSupporter = (profile: Profile) => {
+    setSelectedSupporter(profile);
+    setSupporterSearch(`${profile.full_name} (${profile.unique_code})`);
+    setProfiles([]);
+    setSearchFocused(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Show success toast
-    toast.success("Handshake created successfully!", {
-      description: "Your request has been sent to the supporter.",
-    });
-    
-    // Navigate back to dashboard
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1000);
+    if (!selectedSupporter || !paybackDay) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('handshakes')
+        .insert({
+          requester_id: user?.id,
+          supporter_id: selectedSupporter.id,
+          amount: parseFloat(amount),
+          payback_day: format(paybackDay, 'yyyy-MM-dd'),
+          auto_payback: autoPayback,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+
+      toast.success("Handshake created successfully!", {
+        description: "Your request has been sent to the supporter.",
+      });
+
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1000);
+    } catch (error: any) {
+      toast.error("Error creating handshake", {
+        description: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-6">
@@ -60,7 +144,9 @@ const CreateHandshake = () => {
                 <Input
                   id="amount"
                   type="number"
-                  placeholder="0"
+                  step="0.01"
+                  min="1"
+                  placeholder="0.00"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="pl-10 text-lg bg-input/50 border-border/50 focus:border-secondary transition-all"
@@ -69,19 +155,65 @@ const CreateHandshake = () => {
               </div>
             </div>
 
-            {/* Supporter */}
-            <div className="space-y-2">
+            {/* Supporter Search */}
+            <div className="space-y-2 relative">
               <Label htmlFor="supporter">Select Supporter</Label>
-              <Input
-                id="supporter"
-                type="text"
-                placeholder="Search or enter name..."
-                value={supporter}
-                onChange={(e) => setSupporter(e.target.value)}
-                className="bg-input/50 border-border/50 focus:border-secondary transition-all"
-                required
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/60" />
+                <Input
+                  id="supporter"
+                  type="text"
+                  placeholder="Search by name or unique code..."
+                  value={supporterSearch}
+                  onChange={(e) => setSupporterSearch(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  className="pl-10 bg-input/50 border-border/50 focus:border-secondary transition-all"
+                  required
+                />
+              </div>
+              
+              {/* Search Results */}
+              {searchFocused && profiles.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 glass border border-border/50 rounded-lg overflow-hidden">
+                  {profiles.map((profile) => (
+                    <button
+                      key={profile.id}
+                      type="button"
+                      onClick={() => selectSupporter(profile)}
+                      className="w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors border-b border-border/30 last:border-0"
+                    >
+                      <div className="font-medium">{profile.full_name}</div>
+                      <div className="text-sm text-foreground/60 font-mono">{profile.unique_code}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* Selected Supporter */}
+            {selectedSupporter && (
+              <GlassCard className="bg-secondary/10 border-secondary/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{selectedSupporter.full_name}</div>
+                    <div className="text-sm text-foreground/60 font-mono">
+                      {selectedSupporter.unique_code}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedSupporter(null);
+                      setSupporterSearch("");
+                    }}
+                  >
+                    Change
+                  </Button>
+                </div>
+              </GlassCard>
+            )}
 
             {/* Payback Day */}
             <div className="space-y-2">
@@ -89,6 +221,7 @@ const CreateHandshake = () => {
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    type="button"
                     variant="outline"
                     className="w-full justify-start text-left font-normal bg-input/50 border-border/50 hover:border-secondary transition-all"
                   >
@@ -115,7 +248,7 @@ const CreateHandshake = () => {
                   Enable Auto Payback
                 </Label>
                 <p className="text-sm text-foreground/60">
-                  Automatically pay on the due date
+                  Automatically pay on the due date (Premium feature)
                 </p>
               </div>
               <Switch
@@ -136,9 +269,10 @@ const CreateHandshake = () => {
             {/* Submit Button */}
             <Button
               type="submit"
+              disabled={loading}
               className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
             >
-              Create Handshake
+              {loading ? "Creating..." : "Create Handshake"}
             </Button>
           </form>
         </GlassCard>
