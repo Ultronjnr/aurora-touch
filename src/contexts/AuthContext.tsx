@@ -46,9 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   const signUp = async (
-    email: string, 
-    password: string, 
-    fullName: string, 
+    email: string,
+    password: string,
+    fullName: string,
     phone: string,
     role: 'requester' | 'supporter'
   ) => {
@@ -66,13 +66,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) return { error };
-      
-      // Add user role
+
       if (data.user) {
+        // Generate unique code via RPC if available, else fallback
+        let uniqueCode = '';
+        try {
+          const { data: codeData, error: codeErr } = await supabase.rpc('generate_unique_code');
+          if (codeErr) throw codeErr;
+          uniqueCode = codeData as string;
+        } catch {
+          uniqueCode = `CM-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+        }
+
+        // Ensure profile exists
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            full_name: fullName,
+            phone: phone,
+            unique_code: uniqueCode,
+          });
+        if (profileError) console.error('Profile error:', profileError);
+
+        // Add user role
         const { error: roleError } = await supabase
           .from('user_roles')
           .insert({ user_id: data.user.id, role });
-        
         if (roleError) console.error('Role error:', roleError);
       }
 
