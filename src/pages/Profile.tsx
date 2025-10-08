@@ -59,7 +59,8 @@ const Profile = () => {
       if (error) throw error;
       setProfile(data);
     } catch (error: any) {
-      toast.error("Error loading profile");
+      console.error('Fetch profile error:', error);
+      toast.error("Error loading profile", { description: error?.message || String(error) });
     } finally {
       setLoading(false);
     }
