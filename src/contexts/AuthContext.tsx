@@ -124,11 +124,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { data: codeData, error: codeErr } = await supabase.rpc('generate_unique_code');
           if (codeErr) throw codeErr;
           uniqueCode = codeData as string;
-        } catch {
+        } catch (e) {
           uniqueCode = `CM-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Date.now().toString().slice(-4)}`;
         }
 
-        // Ensure profile exists — try direct insert, if RLS blocks it, fallback to RPC if available
+        // Try to insert profile now; if RLS blocks it (no session), save pending and it will be created on sign-in
         try {
           const { error: profileError } = await supabase
             .from('profiles')
@@ -138,37 +138,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               phone: phone,
               unique_code: uniqueCode,
             });
+
           if (profileError) {
             console.error('Profile insert error (direct):', profileError);
-            // Try RPC fallback (create_profile) which should be a security-definer function
-            try {
-              const { data: rpcData, error: rpcErr } = await supabase.rpc('create_profile', {
-                p_id: data.user.id,
-                p_full_name: fullName,
-                p_phone: phone,
-                p_unique_code: uniqueCode,
-              } as any);
-              if (rpcErr) {
-                console.error('Profile RPC error:', rpcErr);
-              } else {
-                console.info('Profile created via RPC', rpcData);
-              }
-            } catch (rpcEx) {
-              console.error('Profile RPC exception:', rpcEx);
-            }
+            // Save pending profile to localStorage so it can be created after email confirmation / sign-in
+            localStorage.setItem('pending_profile', JSON.stringify({ fullName, phone, unique_code: uniqueCode }));
+          } else {
+            localStorage.removeItem('pending_profile');
           }
         } catch (insEx) {
           console.error('Profile insert exception:', insEx);
+          localStorage.setItem('pending_profile', JSON.stringify({ fullName, phone, unique_code: uniqueCode }));
         }
 
-        // Add user role
+        // Add user role — try insert, but if it fails store pending role as well
         try {
           const { error: roleError } = await supabase
             .from('user_roles')
             .insert({ user_id: data.user.id, role });
-          if (roleError) console.error('Role error:', roleError);
+          if (roleError) {
+            console.error('Role insert error:', roleError);
+            localStorage.setItem('pending_role', JSON.stringify({ user_id: data.user.id, role }));
+          } else {
+            localStorage.removeItem('pending_role');
+          }
         } catch (roleEx) {
           console.error('Role insert exception:', roleEx);
+          localStorage.setItem('pending_role', JSON.stringify({ user_id: data.user.id, role }));
         }
       }
 
