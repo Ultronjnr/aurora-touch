@@ -140,7 +140,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
           if (profileError) {
-            console.error('Profile insert error (direct):', profileError);
+            // Detect common RLS/unauthorized errors and treat them as expected during sign-up
+            const errMsg = String(profileError.message || profileError.code || profileError.status);
+            const isRLS = /row-level security|not authenticated|forbidden|permission/i.test(errMsg);
+            if (isRLS) {
+              console.info('Profile insert blocked by RLS (expected before sign-in). Saving pending_profile. Full error:', JSON.stringify(profileError, Object.getOwnPropertyNames(profileError)));
+            } else {
+              console.error('Profile insert error (direct):', JSON.stringify(profileError, Object.getOwnPropertyNames(profileError)));
+            }
             // Save pending profile to localStorage so it can be created after email confirmation / sign-in
             localStorage.setItem('pending_profile', JSON.stringify({ fullName, phone, unique_code: uniqueCode }));
           } else {
@@ -157,7 +164,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .from('user_roles')
             .insert({ user_id: data.user.id, role });
           if (roleError) {
-            console.error('Role insert error:', roleError);
+            const errMsg = String(roleError.message || roleError.code || roleError.status);
+            const isRLS = /row-level security|not authenticated|forbidden|permission/i.test(errMsg);
+            if (isRLS) {
+              console.info('Role insert blocked by RLS (expected before sign-in). Saving pending_role. Full error:', JSON.stringify(roleError, Object.getOwnPropertyNames(roleError)));
+            } else {
+              console.error('Role insert error:', JSON.stringify(roleError, Object.getOwnPropertyNames(roleError)));
+            }
             localStorage.setItem('pending_role', JSON.stringify({ user_id: data.user.id, role }));
           } else {
             localStorage.removeItem('pending_role');
