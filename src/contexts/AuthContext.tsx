@@ -83,22 +83,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           uniqueCode = `CM-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Date.now().toString().slice(-4)}`;
         }
 
-        // Ensure profile exists
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            full_name: fullName,
-            phone: phone,
-            unique_code: uniqueCode,
-          });
-        if (profileError) console.error('Profile error:', profileError);
+        // Ensure profile exists — try direct insert, if RLS blocks it, fallback to RPC if available
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              full_name: fullName,
+              phone: phone,
+              unique_code: uniqueCode,
+            });
+          if (profileError) {
+            console.error('Profile insert error (direct):', profileError);
+            // Try RPC fallback (create_profile) which should be a security-definer function
+            try {
+              const { data: rpcData, error: rpcErr } = await supabase.rpc('create_profile', {
+                p_id: data.user.id,
+                p_full_name: fullName,
+                p_phone: phone,
+                p_unique_code: uniqueCode,
+              } as any);
+              if (rpcErr) {
+                console.error('Profile RPC error:', rpcErr);
+              } else {
+                console.info('Profile created via RPC', rpcData);
+              }
+            } catch (rpcEx) {
+              console.error('Profile RPC exception:', rpcEx);
+            }
+          }
+        } catch (insEx) {
+          console.error('Profile insert exception:', insEx);
+        }
 
         // Add user role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: data.user.id, role });
-        if (roleError) console.error('Role error:', roleError);
+        try {
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .insert({ user_id: data.user.id, role });
+          if (roleError) console.error('Role error:', roleError);
+        } catch (roleEx) {
+          console.error('Role insert exception:', roleEx);
+        }
       }
 
       return { error: null };
