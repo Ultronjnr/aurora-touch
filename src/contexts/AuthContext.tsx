@@ -49,11 +49,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
 
           if (insertErr) {
-            console.error('Profile insert at sign-in failed:', insertErr);
+            console.error('Profile insert at sign-in failed:', JSON.stringify(insertErr, Object.getOwnPropertyNames(insertErr)));
             // store pending and let user know via toast on next page
             localStorage.setItem('pending_profile', JSON.stringify({ fullName: full_name, phone, unique_code }));
           } else {
             localStorage.removeItem('pending_profile');
+          }
+        }
+
+        // If there's a pending role saved from sign-up, try to insert it now that user is authenticated
+        const pendingRoleRaw = localStorage.getItem('pending_role');
+        if (pendingRoleRaw) {
+          try {
+            const pendingRole = JSON.parse(pendingRoleRaw);
+            const { error: roleInsertErr } = await supabase.from('user_roles').insert({
+              user_id: pendingRole.user_id || userObj.id,
+              role: pendingRole.role,
+            });
+            if (roleInsertErr) {
+              console.error('Pending role insert failed:', JSON.stringify(roleInsertErr, Object.getOwnPropertyNames(roleInsertErr)));
+            } else {
+              localStorage.removeItem('pending_role');
+            }
+          } catch (rerr) {
+            console.error('Error processing pending_role:', rerr);
           }
         }
       } catch (e) {
