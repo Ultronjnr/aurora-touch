@@ -4,7 +4,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "input-otp";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const VerifyEmail = () => {
   const [email, setEmail] = useState<string | null>(null);
