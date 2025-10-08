@@ -57,7 +57,7 @@ const CreateHandshake = () => {
       if (error) throw error;
       setProfiles(data || []);
     } catch (error: any) {
-      console.error("Error searching supporters");
+      console.error("Error searching supporters:", error);
     }
   };
 

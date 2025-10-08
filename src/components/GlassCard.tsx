@@ -15,7 +15,7 @@ export const GlassCard = ({ children, className, hover = false, onClick, style }
       onClick={onClick}
       style={style}
       className={cn(
-        "glass rounded-2xl p-6 shadow-lg",
+        "glass rounded-2xl p-4 sm:p-6 md:p-8 shadow-lg",
         hover && "glass-hover cursor-pointer",
         className
       )}

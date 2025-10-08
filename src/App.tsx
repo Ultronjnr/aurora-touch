@@ -7,6 +7,9 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Splash from "./pages/Splash";
 import Onboarding from "./pages/Onboarding";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import UpdatePassword from "./pages/UpdatePassword";
+import VerifyEmail from "./pages/VerifyEmail";
 import Dashboard from "./pages/Dashboard";
 import CreateHandshake from "./pages/CreateHandshake";
 import HandshakeDetail from "./pages/HandshakeDetail";
@@ -26,6 +29,9 @@ const App = () => (
             <Route path="/" element={<Splash />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/update-password" element={<UpdatePassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/create-handshake" element={<CreateHandshake />} />
             <Route path="/handshake/:id" element={<HandshakeDetail />} />

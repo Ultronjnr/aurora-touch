@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
 All colors MUST be HSL.
 */
 
@@ -43,15 +43,15 @@ All colors MUST be HSL.
     --glass-bg: 215 75% 20% / 0.6;
     --glass-border: 0 0% 100% / 0.1;
     --glass-hover: 215 75% 25% / 0.8;
-    
+
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(215 85% 32%), hsl(189 100% 50%));
     --gradient-radial: radial-gradient(circle at 50% 0%, hsl(189 100% 50% / 0.3), transparent 50%);
-    
+
     /* Shadows & Glows */
     --shadow-glow: 0 0 40px hsl(189 100% 50% / 0.3);
     --shadow-card: 0 8px 32px hsl(215 85% 10% / 0.4);
-    
+
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
@@ -61,6 +61,11 @@ All colors MUST be HSL.
 @layer base {
   * {
     @apply border-border;
+  }
+
+  html, body, #root {
+    height: 100%;
+    width: 100%;
   }
 
   body {
@@ -78,43 +83,48 @@ All colors MUST be HSL.
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
-  
+
   .glass-hover {
     @apply glass transition-all duration-300;
   }
-  
+
   .glass-hover:hover {
     background: rgba(29, 53, 87, 0.8);
     border-color: rgba(0, 200, 255, 0.3);
     box-shadow: 0 8px 32px rgba(0, 200, 255, 0.2);
   }
-  
+
   /* Glow Effects */
   .glow-cyan {
     box-shadow: 0 0 20px rgba(0, 200, 255, 0.4);
   }
-  
+
   .glow-cyan-strong {
     box-shadow: 0 0 40px rgba(0, 200, 255, 0.6);
   }
-  
+
+  /* Background gradient utility */
+  .bg-gradient-radial {
+    background: var(--gradient-radial);
+  }
+
   /* Animations */
   .animate-slide-up {
     animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  
+
   .animate-fade-in {
     animation: fadeIn 0.5s ease-out;
   }
-  
+
   .animate-scale-in {
     animation: scaleIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
-  
+
   .animate-bounce-subtle {
     animation: bounceSubtle 0.6s ease-out;
   }
-  
+
   @keyframes slideUp {
     from {
       opacity: 0;
@@ -125,7 +135,7 @@ All colors MUST be HSL.
       transform: translateY(0);
     }
   }
-  
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -134,7 +144,7 @@ All colors MUST be HSL.
       opacity: 1;
     }
   }
-  
+
   @keyframes scaleIn {
     from {
       opacity: 0;
@@ -145,7 +155,7 @@ All colors MUST be HSL.
       transform: scale(1);
     }
   }
-  
+
   @keyframes bounceSubtle {
     0%, 100% {
       transform: translateY(0);
@@ -154,7 +164,7 @@ All colors MUST be HSL.
       transform: translateY(-10px);
     }
   }
-  
+
   /* Gradient Text */
   .gradient-text {
     background: linear-gradient(135deg, hsl(189 100% 50%), hsl(189 100% 70%));
