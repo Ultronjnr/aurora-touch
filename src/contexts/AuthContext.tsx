@@ -26,7 +26,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
+        if (event === 'PASSWORD_RECOVERY') {
+          navigate('/update-password');
+          return;
+        }
+
         if (event === 'SIGNED_IN' && session) {
           setTimeout(() => {
             navigate('/dashboard');

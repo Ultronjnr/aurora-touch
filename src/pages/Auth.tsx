@@ -63,12 +63,14 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
+      localStorage.setItem('pending_email', registerEmail);
       toast({
         title: "Account created!",
-        description: "Welcome to CashMe",
+        description: "Please confirm your email to continue",
       });
+      navigate('/verify-email');
     }
-    
+
     setLoading(false);
   };
 
@@ -131,6 +133,15 @@ const Auth = () => {
                 >
                   {loading ? "Logging in..." : "Login to CashMe"}
                 </Button>
+                <div className="text-sm text-right">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/forgot-password')}
+                    className="text-secondary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </form>
             </TabsContent>
 
