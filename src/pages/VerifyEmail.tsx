@@ -32,7 +32,6 @@ const VerifyEmail = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         },
         body: JSON.stringify({ email, token: code, type: 'signup' })
       });
@@ -70,7 +69,6 @@ const VerifyEmail = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         },
         body: JSON.stringify({ type: 'signup', email })
       });
