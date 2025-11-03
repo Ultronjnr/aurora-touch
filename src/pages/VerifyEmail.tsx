@@ -6,6 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
 const VerifyEmail = () => {
   const [email, setEmail] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -14,17 +17,44 @@ const VerifyEmail = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setEmail(localStorage.getItem('pending_email'));
-  }, []);
+    const savedEmail = localStorage.getItem('pending_email');
+    setEmail(savedEmail);
+    if (!savedEmail) {
+      navigate('/auth');
+    }
+  }, [navigate]);
 
   const verify = async () => {
     if (!email || code.length < 6) return;
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({ email, token: code, type: 'signup' });
-      if (error) throw error;
-      toast({ title: 'Email verified', description: 'You can now log in.' });
-      navigate('/auth');
+      const verifyResponse = await fetch(`${SUPABASE_URL}/functions/v1/auth-verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ email, token: code, type: 'signup' })
+      });
+
+      const data = await verifyResponse.json();
+
+      if (!verifyResponse.ok) {
+        throw new Error(data.error?.message || 'Verification failed');
+      }
+
+      // Set session with returned tokens
+      if (data.access_token) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token || '',
+        });
+        if (sessionError) throw sessionError;
+      }
+
+      toast({ title: 'Email verified', description: 'Welcome to CashMe!' });
+      localStorage.removeItem('pending_email');
+      navigate('/dashboard');
     } catch (err: any) {
       toast({ title: 'Verification failed', description: err.message, variant: 'destructive' });
     } finally {
@@ -36,9 +66,22 @@ const VerifyEmail = () => {
     if (!email) return;
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resend({ type: 'signup', email });
-      if (error) throw error;
-      toast({ title: 'Confirmation sent', description: `We re-sent the code/link to ${email}` });
+      const resendResponse = await fetch(`${SUPABASE_URL}/functions/v1/auth-resend`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ type: 'signup', email })
+      });
+
+      const data = await resendResponse.json();
+
+      if (!resendResponse.ok) {
+        throw new Error(data.error?.message || 'Resend failed');
+      }
+
+      toast({ title: 'Confirmation sent', description: `We re-sent the code to ${email}` });
     } catch (err: any) {
       toast({ title: 'Resend failed', description: err.message, variant: 'destructive' });
     } finally {
