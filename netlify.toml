@@ -3,8 +3,8 @@ command = "npm run build"
 publish = "dist"
 
 [env]
-VITE_SUPABASE_URL = "https://ffdkunhyomcqifzueuuh.supabase.co"
-VITE_SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmZGt1bmh5b21jcWlmenVldXVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxNDg1NDcsImV4cCI6MjA3NzcyNDU0N30.E1lB7W-Xk5kvaa0lkfiL1yljfzGqxN4TveAHw_NmTP4"
+VITE_SUPABASE_URL = "https://ckxtqxskekivqsvjdzaa.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNreHRxeHNrZWtpdnFzdmpkemFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk0MDAxMTksImV4cCI6MjA3NDk3NjExOX0.KdRQGAj4M0ZSODBcXkH2CKPI3kF4FH6-c_kPjgrRIV8"
 
 [[redirects]]
 from = "/*"
