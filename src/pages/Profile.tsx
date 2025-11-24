@@ -8,7 +8,7 @@ import {
   Mail, 
   Phone, 
   Shield, 
-  Crown, 
+  TrendingUp, 
   Settings,
   LogOut,
   Copy,
@@ -24,7 +24,6 @@ interface UserProfile {
   full_name: string;
   phone: string;
   cash_rating: number;
-  subscription_active: boolean;
   id_verified: boolean;
 }
 
@@ -175,25 +174,20 @@ const Profile = () => {
           </div>
         </GlassCard>
 
-        {/* Premium Card */}
-        {!profile?.subscription_active && (
-          <GlassCard 
-            hover 
-            className="bg-gradient-to-r from-primary/50 to-secondary/50 border-secondary/30 cursor-pointer animate-slide-in-right"
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-secondary/30">
-                <Crown className="w-8 h-8 text-secondary" />
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold text-lg mb-1">Go Premium</div>
-                <div className="text-sm text-foreground/80">
-                  Unlock Auto Payback, analytics & more
-                </div>
+        {/* Pay-as-you-go Card */}
+        <GlassCard className="bg-gradient-to-r from-primary/20 to-secondary/20 border-secondary/30 animate-slide-in-right">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-full bg-secondary/30">
+              <TrendingUp className="w-8 h-8 text-secondary" />
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-lg mb-1">Pay-as-you-go</div>
+              <div className="text-sm text-foreground/80">
+                5% transaction fee - only pay when you make handshakes
               </div>
             </div>
-          </GlassCard>
-        )}
+          </div>
+        </GlassCard>
 
         {/* Info Cards */}
         <div className="space-y-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
