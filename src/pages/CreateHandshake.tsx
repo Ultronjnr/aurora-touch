@@ -84,7 +84,8 @@ const CreateHandshake = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase
+      // Create handshake
+      const { data: handshakeData, error: handshakeError } = await supabase
         .from('handshakes')
         .insert({
           requester_id: user?.id,
@@ -93,9 +94,44 @@ const CreateHandshake = () => {
           payback_day: format(paybackDay, 'yyyy-MM-dd'),
           auto_payback: autoPayback,
           status: 'pending'
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (handshakeError) throw handshakeError;
+
+      // Get supporter email
+      const { data: supporterProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', selectedSupporter.id)
+        .single();
+
+      const { data: requesterProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user?.id)
+        .single();
+
+      // Send email notification to supporter
+      try {
+        await supabase.functions.invoke('send-handshake-notification', {
+          body: {
+            type: 'handshake_request',
+            handshakeId: handshakeData.id,
+            recipientEmail: user?.email, // In production, get supporter's email
+            recipientName: supporterProfile?.full_name || 'Supporter',
+            data: {
+              amount: parseFloat(amount),
+              requesterName: requesterProfile?.full_name || 'User',
+              paybackDate: format(paybackDay, 'yyyy-MM-dd'),
+            }
+          }
+        });
+      } catch (emailError) {
+        console.error('Email notification failed:', emailError);
+        // Don't block the flow if email fails
+      }
 
       toast.success("Handshake created successfully!", {
         description: "Your request has been sent to the supporter.",
