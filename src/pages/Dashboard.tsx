@@ -22,7 +22,6 @@ interface Profile {
   unique_code: string;
   full_name: string;
   cash_rating: number;
-  subscription_active: boolean;
   kyc_completed: boolean;
 }
 
@@ -59,7 +58,7 @@ const Dashboard = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('unique_code, full_name, cash_rating, subscription_active, kyc_completed')
+        .select('unique_code, full_name, cash_rating, kyc_completed')
         .eq('id', user?.id)
         .single();
 
@@ -184,20 +183,18 @@ const Dashboard = () => {
           </div>
         </GlassCard>
 
-        {/* Premium Banner */}
-        {!profile?.subscription_active && (
-          <GlassCard hover className="bg-gradient-to-r from-primary/50 to-secondary/50 border-secondary/30 animate-slide-in-right">
-            <div className="flex items-center gap-4">
-              <Crown className="w-10 h-10 text-secondary" />
-              <div className="flex-1">
-                <div className="font-semibold mb-1">Upgrade to Premium</div>
-                <div className="text-sm text-foreground/70">
-                  Enable Auto Payback & advanced analytics
-                </div>
+        {/* Pay-as-you-go Info */}
+        <GlassCard className="bg-gradient-to-r from-primary/20 to-secondary/20 border-secondary/30 animate-slide-in-right">
+          <div className="flex items-center gap-4">
+            <TrendingUp className="w-10 h-10 text-secondary" />
+            <div className="flex-1">
+              <div className="font-semibold mb-1">Pay-as-you-go</div>
+              <div className="text-sm text-foreground/70">
+                5% fee per transaction - only pay when you transact
               </div>
             </div>
-          </GlassCard>
-        )}
+          </div>
+        </GlassCard>
 
         {/* Active Handshakes */}
         {activeHandshakes.length > 0 && (

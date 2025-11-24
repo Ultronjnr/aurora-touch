@@ -84,6 +84,9 @@ const CreateHandshake = () => {
     setLoading(true);
 
     try {
+      // Calculate 5% transaction fee
+      const transactionFee = parseFloat(amount) * 0.05;
+      
       // Create handshake
       const { data: handshakeData, error: handshakeError } = await supabase
         .from('handshakes')
@@ -93,7 +96,8 @@ const CreateHandshake = () => {
           amount: parseFloat(amount),
           payback_day: format(paybackDay, 'yyyy-MM-dd'),
           auto_payback: autoPayback,
-          status: 'pending'
+          status: 'pending',
+          transaction_fee: transactionFee,
         })
         .select()
         .single();
@@ -115,6 +119,7 @@ const CreateHandshake = () => {
 
       // Send email notification to supporter
       try {
+        const transactionFee = parseFloat(amount) * 0.05;
         await supabase.functions.invoke('send-handshake-notification', {
           body: {
             type: 'handshake_request',
@@ -125,6 +130,7 @@ const CreateHandshake = () => {
               amount: parseFloat(amount),
               requesterName: requesterProfile?.full_name || 'User',
               paybackDate: format(paybackDay, 'yyyy-MM-dd'),
+              transactionFee: transactionFee,
             }
           }
         });
@@ -342,6 +348,24 @@ const CreateHandshake = () => {
                 onCheckedChange={setAutoPayback}
               />
             </div>
+
+            {/* Transaction Fee Info */}
+            {amount && parseFloat(amount) > 0 && (
+              <div className="p-4 rounded-lg bg-primary/10 border border-primary/30 space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-foreground/80">Amount Requested:</span>
+                  <span className="font-semibold">R {parseFloat(amount).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-foreground/80">Transaction Fee (5%):</span>
+                  <span className="font-semibold text-secondary">R {(parseFloat(amount) * 0.05).toFixed(2)}</span>
+                </div>
+                <div className="border-t border-border/30 pt-2 mt-2 flex justify-between items-center">
+                  <span className="font-semibold">Total to Repay:</span>
+                  <span className="font-bold text-lg gradient-text">R {(parseFloat(amount) + parseFloat(amount) * 0.05).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
 
             {/* Info Box */}
             <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/30">

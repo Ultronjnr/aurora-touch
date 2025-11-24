@@ -27,6 +27,7 @@ export type Database = {
           requester_id: string
           status: string | null
           supporter_id: string
+          transaction_fee: number | null
           updated_at: string | null
         }
         Insert: {
@@ -41,6 +42,7 @@ export type Database = {
           requester_id: string
           status?: string | null
           supporter_id: string
+          transaction_fee?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -55,6 +57,7 @@ export type Database = {
           requester_id?: string
           status?: string | null
           supporter_id?: string
+          transaction_fee?: number | null
           updated_at?: string | null
         }
         Relationships: [
