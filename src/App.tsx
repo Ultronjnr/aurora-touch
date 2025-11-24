@@ -7,6 +7,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Splash from "./pages/Splash";
 import Onboarding from "./pages/Onboarding";
 import Auth from "./pages/Auth";
+import KYCOnboarding from "./pages/KYCOnboarding";
 import Dashboard from "./pages/Dashboard";
 import CreateHandshake from "./pages/CreateHandshake";
 import HandshakeDetail from "./pages/HandshakeDetail";
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/" element={<Splash />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/kyc" element={<KYCOnboarding />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/create-handshake" element={<CreateHandshake />} />
             <Route path="/handshake/:id" element={<HandshakeDetail />} />

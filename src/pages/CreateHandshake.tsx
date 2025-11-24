@@ -17,6 +17,10 @@ interface Profile {
   id: string;
   unique_code: string;
   full_name: string;
+  account_number: string | null;
+  branch_code: string | null;
+  account_type: string | null;
+  phone: string | null;
 }
 
 const CreateHandshake = () => {
@@ -49,8 +53,9 @@ const CreateHandshake = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, unique_code, full_name')
+        .select('id, unique_code, full_name, account_number, branch_code, account_type, phone')
         .neq('id', user?.id)
+        .eq('kyc_completed', true) // Only show verified users
         .or(`unique_code.ilike.%${supporterSearch}%,full_name.ilike.%${supporterSearch}%`)
         .limit(5);
 
@@ -190,14 +195,14 @@ const CreateHandshake = () => {
               )}
             </div>
 
-            {/* Selected Supporter */}
+            {/* Selected Supporter - Full Banking Details */}
             {selectedSupporter && (
-              <GlassCard className="bg-secondary/10 border-secondary/30">
-                <div className="flex items-center justify-between">
+              <GlassCard className="bg-secondary/10 border-secondary/30 space-y-4">
+                <div className="flex items-center justify-between border-b border-border/30 pb-3">
                   <div>
-                    <div className="font-medium">{selectedSupporter.full_name}</div>
+                    <div className="font-bold text-lg">{selectedSupporter.full_name}</div>
                     <div className="text-sm text-foreground/60 font-mono">
-                      {selectedSupporter.unique_code}
+                      Code: {selectedSupporter.unique_code}
                     </div>
                   </div>
                   <Button
@@ -208,9 +213,53 @@ const CreateHandshake = () => {
                       setSelectedSupporter(null);
                       setSupporterSearch("");
                     }}
+                    className="hover:bg-secondary/20"
                   >
                     Change
                   </Button>
+                </div>
+
+                {/* Banking Details Display */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-foreground/80 uppercase tracking-wide">
+                    Banking Information
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <div className="text-xs text-foreground/60 uppercase">Account Number</div>
+                      <div className="font-mono font-medium text-sm">
+                        {selectedSupporter.account_number || "Not provided"}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-xs text-foreground/60 uppercase">Branch Code</div>
+                      <div className="font-mono font-medium text-sm">
+                        {selectedSupporter.branch_code || "Not provided"}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-xs text-foreground/60 uppercase">Account Type</div>
+                      <div className="font-medium text-sm capitalize">
+                        {selectedSupporter.account_type || "Not provided"}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-xs text-foreground/60 uppercase">Phone</div>
+                      <div className="font-medium text-sm">
+                        {selectedSupporter.phone || "Not provided"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-border/30">
+                  <p className="text-xs text-foreground/60 italic">
+                    ✓ Verified user - All details confirmed through KYC
+                  </p>
                 </div>
               </GlassCard>
             )}
