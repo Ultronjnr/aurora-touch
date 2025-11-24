@@ -23,6 +23,7 @@ interface Profile {
   full_name: string;
   cash_rating: number;
   subscription_active: boolean;
+  kyc_completed: boolean;
 }
 
 interface Handshake {
@@ -58,12 +59,17 @@ const Dashboard = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('unique_code, full_name, cash_rating, subscription_active')
+        .select('unique_code, full_name, cash_rating, subscription_active, kyc_completed')
         .eq('id', user?.id)
         .single();
 
       if (error) throw error;
       setProfile(data);
+      
+      // Redirect to KYC if not completed
+      if (!data.kyc_completed) {
+        navigate("/kyc");
+      }
     } catch (error: any) {
       toast.error("Error loading profile");
     }

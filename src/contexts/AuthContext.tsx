@@ -23,13 +23,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN' && session) {
+          // Check if user has completed KYC
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('kyc_completed')
+            .eq('id', session.user.id)
+            .single();
+          
           setTimeout(() => {
-            navigate('/dashboard');
+            if (profile?.kyc_completed) {
+              navigate('/dashboard');
+            } else {
+              navigate('/kyc');
+            }
           }, 0);
         }
       }

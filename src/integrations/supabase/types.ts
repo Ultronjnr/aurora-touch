@@ -159,36 +159,51 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_number: string | null
+          account_type: string | null
           avatar_url: string | null
+          branch_code: string | null
           cash_rating: number | null
           created_at: string | null
           full_name: string
           id: string
+          id_document_url: string | null
           id_verified: boolean | null
+          kyc_completed: boolean | null
           phone: string | null
           subscription_active: boolean | null
           unique_code: string
           updated_at: string | null
         }
         Insert: {
+          account_number?: string | null
+          account_type?: string | null
           avatar_url?: string | null
+          branch_code?: string | null
           cash_rating?: number | null
           created_at?: string | null
           full_name: string
           id: string
+          id_document_url?: string | null
           id_verified?: boolean | null
+          kyc_completed?: boolean | null
           phone?: string | null
           subscription_active?: boolean | null
           unique_code: string
           updated_at?: string | null
         }
         Update: {
+          account_number?: string | null
+          account_type?: string | null
           avatar_url?: string | null
+          branch_code?: string | null
           cash_rating?: number | null
           created_at?: string | null
           full_name?: string
           id?: string
+          id_document_url?: string | null
           id_verified?: boolean | null
+          kyc_completed?: boolean | null
           phone?: string | null
           subscription_active?: boolean | null
           unique_code?: string
