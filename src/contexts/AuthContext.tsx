@@ -28,20 +28,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN' && session) {
-          // Check if user has completed KYC
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('kyc_completed')
-            .eq('id', session.user.id)
-            .single();
-          
-          setTimeout(() => {
+          // Wait for profile to be available
+          setTimeout(async () => {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('kyc_completed')
+              .eq('id', session.user.id)
+              .single();
+            
             if (profile?.kyc_completed) {
               navigate('/dashboard');
             } else {
               navigate('/kyc');
             }
-          }, 0);
+          }, 1000);
         }
       }
     );
@@ -78,13 +78,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) return { error };
       
-      // Add user role
+      // Wait a moment for the profile to be created by the trigger
       if (data.user) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Add user role - this is critical for both requesters and supporters
         const { error: roleError } = await supabase
           .from('user_roles')
           .insert({ user_id: data.user.id, role });
         
-        if (roleError) console.error('Role error:', roleError);
+        if (roleError) {
+          console.error('Role insertion failed:', roleError);
+          return { error: { message: 'Failed to set user role. Please contact support.' } };
+        }
       }
 
       return { error: null };
