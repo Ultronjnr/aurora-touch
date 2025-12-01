@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { GlassCard } from "@/components/GlassCard";
-import { ArrowLeft, Calendar as CalendarIcon, Search } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Search, AlertTriangle } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -34,6 +35,12 @@ const CreateHandshake = () => {
   const [autoPayback, setAutoPayback] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
+  
+  // Penalty agreement states
+  const [penaltyEnabled, setPenaltyEnabled] = useState(false);
+  const [penaltyType, setPenaltyType] = useState<'fixed' | 'percentage'>('percentage');
+  const [penaltyAmount, setPenaltyAmount] = useState("");
+  const [gracePeriodDays, setGracePeriodDays] = useState("0");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -87,7 +94,7 @@ const CreateHandshake = () => {
       // Calculate 5% transaction fee
       const transactionFee = parseFloat(amount) * 0.05;
       
-      // Create handshake
+      // Create handshake with penalty agreement
       const { data: handshakeData, error: handshakeError } = await supabase
         .from('handshakes')
         .insert({
@@ -98,6 +105,11 @@ const CreateHandshake = () => {
           auto_payback: autoPayback,
           status: 'pending',
           transaction_fee: transactionFee,
+          penalty_enabled: penaltyEnabled,
+          penalty_type: penaltyEnabled ? penaltyType : null,
+          penalty_amount: penaltyEnabled ? parseFloat(penaltyAmount) : 0,
+          grace_period_days: penaltyEnabled ? parseInt(gracePeriodDays) : 0,
+          penalty_accepted: false, // Requester needs to accept
         })
         .select()
         .single();
@@ -339,7 +351,7 @@ const CreateHandshake = () => {
                   Enable Auto Payback
                 </Label>
                 <p className="text-sm text-foreground/60">
-                  Automatically pay on the due date (Premium feature)
+                  Automatically pay on the due date
                 </p>
               </div>
               <Switch
@@ -348,6 +360,105 @@ const CreateHandshake = () => {
                 onCheckedChange={setAutoPayback}
               />
             </div>
+
+            {/* Penalty Agreement */}
+            <GlassCard className="bg-yellow-500/5 border-yellow-500/30 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                    <Label htmlFor="penalty-enabled" className="cursor-pointer font-semibold">
+                      Late Payment Penalty
+                    </Label>
+                  </div>
+                  <p className="text-sm text-foreground/60">
+                    Set penalty for late repayments
+                  </p>
+                </div>
+                <Switch
+                  id="penalty-enabled"
+                  checked={penaltyEnabled}
+                  onCheckedChange={setPenaltyEnabled}
+                />
+              </div>
+
+              {penaltyEnabled && (
+                <div className="space-y-4 pt-4 border-t border-border/30">
+                  {/* Penalty Type */}
+                  <div className="space-y-3">
+                    <Label>Penalty Type</Label>
+                    <RadioGroup value={penaltyType} onValueChange={(value) => setPenaltyType(value as 'fixed' | 'percentage')}>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="fixed" id="fixed" />
+                        <Label htmlFor="fixed" className="cursor-pointer font-normal">
+                          Fixed Amount (R)
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="percentage" id="percentage" />
+                        <Label htmlFor="percentage" className="cursor-pointer font-normal">
+                          Percentage (%)
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {/* Penalty Amount */}
+                  <div className="space-y-2">
+                    <Label htmlFor="penalty-amount">
+                      {penaltyType === 'fixed' ? 'Penalty Amount (R)' : 'Penalty Percentage (%)'}
+                    </Label>
+                    <Input
+                      id="penalty-amount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder={penaltyType === 'fixed' ? '50.00' : '5.00'}
+                      value={penaltyAmount}
+                      onChange={(e) => setPenaltyAmount(e.target.value)}
+                      className="bg-input/50 border-border/50"
+                      required={penaltyEnabled}
+                    />
+                  </div>
+
+                  {/* Grace Period */}
+                  <div className="space-y-2">
+                    <Label htmlFor="grace-period">Grace Period (Days)</Label>
+                    <Input
+                      id="grace-period"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={gracePeriodDays}
+                      onChange={(e) => setGracePeriodDays(e.target.value)}
+                      className="bg-input/50 border-border/50"
+                    />
+                    <p className="text-xs text-foreground/60">
+                      Number of days after due date before penalty applies
+                    </p>
+                  </div>
+
+                  {/* Penalty Preview */}
+                  {penaltyAmount && parseFloat(penaltyAmount) > 0 && (
+                    <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                      <div className="text-sm font-medium text-yellow-500 mb-1">Penalty Preview</div>
+                      <div className="text-xs text-foreground/70">
+                        {penaltyType === 'fixed' 
+                          ? `R ${parseFloat(penaltyAmount).toFixed(2)} per day after grace period`
+                          : `${parseFloat(penaltyAmount).toFixed(1)}% of outstanding amount per day after grace period`
+                        }
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
+                    <p className="text-xs text-foreground/60 italic">
+                      ⚠️ The requester must accept these penalty terms before the handshake becomes active
+                    </p>
+                  </div>
+                </div>
+              )}
+            </GlassCard>
 
             {/* Transaction Fee Info */}
             {amount && parseFloat(amount) > 0 && (
