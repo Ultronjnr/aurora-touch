@@ -193,6 +193,21 @@ const Dashboard = () => {
 
           {/* Borrower View */}
           <TabsContent value="borrower" className="space-y-6 mt-6">
+            {/* Partial Payments Info */}
+            <GlassCard className="bg-secondary/5 border-secondary/30 animate-slide-down">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-secondary/20">
+                  <Wallet className="w-5 h-5 text-secondary" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-sm mb-1">Flexible Repayments</div>
+                  <div className="text-xs text-foreground/70">
+                    Pay in chunks! Make partial payments anytime - R20 today, R50 tomorrow. Your outstanding balance updates automatically.
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+
         {/* Cash Rating Card */}
         <GlassCard className="animate-scale-in">
           <div className="flex items-center justify-between mb-4">
@@ -239,6 +254,21 @@ const Dashboard = () => {
 
           {/* Lender View */}
           <TabsContent value="lender" className="space-y-6 mt-6">
+            {/* Partial Payments Info */}
+            <GlassCard className="bg-secondary/5 border-secondary/30 animate-slide-down">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-secondary/20">
+                  <CheckCircle2 className="w-5 h-5 text-secondary" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-sm mb-1">Track Partial Repayments</div>
+                  <div className="text-xs text-foreground/70">
+                    Borrowers can repay in installments. View real-time progress and outstanding balances for each handshake.
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+
             {/* Incoming Requests */}
             {user && <IncomingHandshakeRequests userId={user.id} />}
 
