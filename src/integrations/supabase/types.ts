@@ -17,6 +17,7 @@ export type Database = {
       handshakes: {
         Row: {
           amount: number
+          amount_paid: number | null
           auto_payback: boolean | null
           completed_at: string | null
           created_at: string | null
@@ -37,6 +38,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          amount_paid?: number | null
           auto_payback?: boolean | null
           completed_at?: string | null
           created_at?: string | null
@@ -57,6 +59,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          amount_paid?: number | null
           auto_payback?: boolean | null
           completed_at?: string | null
           created_at?: string | null
@@ -261,6 +264,10 @@ export type Database = {
     }
     Functions: {
       generate_unique_code: { Args: never; Returns: string }
+      get_outstanding_balance: {
+        Args: { handshake_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -12,11 +12,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Check,
-  X
+  X,
+  Wallet
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { PaymentDialog } from "@/components/PaymentDialog";
+import { PaymentHistory } from "@/components/PaymentHistory";
 
 interface HandshakeData {
   id: string;
@@ -32,6 +35,8 @@ interface HandshakeData {
   penalty_amount: number;
   grace_period_days: number;
   penalty_accepted: boolean;
+  transaction_fee: number;
+  amount_paid: number;
   requester: {
     full_name: string;
     unique_code: string;
@@ -49,6 +54,7 @@ const HandshakeDetail = () => {
   const [handshake, setHandshake] = useState<HandshakeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -224,6 +230,12 @@ const HandshakeDetail = () => {
   const isRequester = user?.id === handshake.requester_id;
   const isPending = handshake.status === 'pending';
   const needsPenaltyAcceptance = handshake.penalty_enabled && !handshake.penalty_accepted && isRequester && isPending;
+  
+  // Calculate outstanding balance
+  const totalDue = handshake.amount + (handshake.transaction_fee || 0) + (handshake.late_fee || 0);
+  const amountPaid = handshake.amount_paid || 0;
+  const outstandingBalance = totalDue - amountPaid;
+  const paymentProgress = totalDue > 0 ? (amountPaid / totalDue) * 100 : 0;
 
   return (
     <div className="min-h-screen p-6">
@@ -243,7 +255,9 @@ const HandshakeDetail = () => {
       <div className="max-w-md mx-auto space-y-6">
         {/* Amount Card */}
         <GlassCard className="text-center animate-scale-in">
-          <div className="text-sm text-foreground/60 mb-2">Total Amount</div>
+          <div className="text-sm text-foreground/60 mb-2">
+            {handshake.status === 'completed' ? 'Total Amount (Paid)' : 'Total Amount'}
+          </div>
           <div className="text-5xl font-bold gradient-text mb-4">
             R {handshake.amount}
           </div>
@@ -264,6 +278,40 @@ const HandshakeDetail = () => {
             <span className="capitalize">{handshake.status}</span>
           </div>
         </GlassCard>
+
+        {/* Outstanding Balance Card */}
+        {handshake.status !== 'completed' && handshake.status !== 'rejected' && isRequester && (
+          <GlassCard className="animate-scale-in bg-primary/5 border-primary/30" style={{ animationDelay: "0.05s" }}>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-primary" />
+                  <span className="font-semibold">Outstanding Balance</span>
+                </div>
+                <div className="text-2xl font-bold gradient-text">
+                  R {outstandingBalance.toFixed(2)}
+                </div>
+              </div>
+              
+              <Progress value={paymentProgress} className="h-2" />
+              
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="text-center">
+                  <div className="text-foreground/60">Total Due</div>
+                  <div className="font-semibold">R {totalDue.toFixed(2)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-foreground/60">Paid</div>
+                  <div className="font-semibold text-green-400">R {amountPaid.toFixed(2)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-foreground/60">Remaining</div>
+                  <div className="font-semibold text-yellow-400">R {outstandingBalance.toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        )}
 
         {/* Progress Card */}
         {daysUntilDue > 0 && handshake.status !== 'completed' && (
@@ -430,12 +478,21 @@ const HandshakeDetail = () => {
           )}
 
           {/* Requester payment button */}
-          {isRequester && !needsPenaltyAcceptance && (handshake.status === 'approved' || handshake.status === 'active') && (
+          {isRequester && !needsPenaltyAcceptance && (handshake.status === 'approved' || handshake.status === 'active') && outstandingBalance > 0 && (
             <Button
+              onClick={() => setPaymentDialogOpen(true)}
               className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
             >
+              <Wallet className="w-5 h-5 mr-2" />
               Make Payment
             </Button>
+          )}
+
+          {/* Payment History */}
+          {(handshake.status === 'active' || handshake.status === 'completed') && (
+            <div className="animate-slide-up" style={{ animationDelay: "0.2s" }}>
+              <PaymentHistory handshakeId={handshake.id} />
+            </div>
           )}
 
           <Button
@@ -447,6 +504,15 @@ const HandshakeDetail = () => {
           </Button>
         </div>
       </div>
+
+      {/* Payment Dialog */}
+      <PaymentDialog
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        handshakeId={handshake.id}
+        outstandingBalance={outstandingBalance}
+        onPaymentSuccess={fetchHandshake}
+      />
     </div>
   );
 };
