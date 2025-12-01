@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, 
   User, 
@@ -10,7 +11,9 @@ import {
   Calendar, 
   CheckCircle2, 
   Clock, 
-  AlertCircle
+  AlertCircle,
+  Wallet,
+  HandshakeIcon
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +22,9 @@ import logo from "@/assets/cashme-logo.png";
 import { UpcomingPayments } from "@/components/UpcomingPayments";
 import { BorrowerAnalytics } from "@/components/BorrowerAnalytics";
 import { CashRatingBreakdown } from "@/components/CashRatingBreakdown";
+import { IncomingHandshakeRequests } from "@/components/IncomingHandshakeRequests";
+import { ExpectedIncomeTracker } from "@/components/ExpectedIncomeTracker";
+import { LendingAnalytics } from "@/components/LendingAnalytics";
 
 interface Profile {
   unique_code: string;
@@ -143,6 +149,10 @@ const Dashboard = () => {
 
   const activeHandshakes = handshakes.filter(h => ["pending", "approved", "active"].includes(h.status));
   const completedHandshakes = handshakes.filter(h => h.status === "completed");
+  
+  // Separate handshakes by role
+  const borrowerHandshakes = activeHandshakes.filter(h => h.requester?.unique_code !== profile?.unique_code);
+  const lenderHandshakes = activeHandshakes.filter(h => h.supporter?.unique_code !== profile?.unique_code);
 
   return (
     <div className="min-h-screen p-6 pb-24">
@@ -166,6 +176,21 @@ const Dashboard = () => {
       </header>
 
       <div className="max-w-md mx-auto space-y-6">
+        {/* Role Tabs */}
+        <Tabs defaultValue="borrower" className="w-full animate-slide-up">
+          <TabsList className="grid w-full grid-cols-2 glass">
+            <TabsTrigger value="borrower" className="flex items-center gap-2">
+              <Wallet className="w-4 h-4" />
+              Borrower
+            </TabsTrigger>
+            <TabsTrigger value="lender" className="flex items-center gap-2">
+              <HandshakeIcon className="w-4 h-4" />
+              Lender
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Borrower View */}
+          <TabsContent value="borrower" className="space-y-6 mt-6">
         {/* Cash Rating Card */}
         <GlassCard className="animate-scale-in">
           <div className="flex items-center justify-between mb-4">
@@ -196,18 +221,45 @@ const Dashboard = () => {
           <CashRatingBreakdown userId={user.id} cashRating={profile.cash_rating || 100} />
         )}
 
-        {/* Pay-as-you-go Info */}
-        <GlassCard className="bg-gradient-to-r from-primary/20 to-secondary/20 border-secondary/30 animate-slide-in-right">
-          <div className="flex items-center gap-4">
-            <TrendingUp className="w-10 h-10 text-secondary" />
-            <div className="flex-1">
-              <div className="font-semibold mb-1">Pay-as-you-go</div>
-              <div className="text-sm text-foreground/70">
-                5% fee per transaction - only pay when you transact
+            {/* Pay-as-you-go Info */}
+            <GlassCard className="bg-gradient-to-r from-primary/20 to-secondary/20 border-secondary/30 animate-slide-in-right">
+              <div className="flex items-center gap-4">
+                <TrendingUp className="w-10 h-10 text-secondary" />
+                <div className="flex-1">
+                  <div className="font-semibold mb-1">Pay-as-you-go</div>
+                  <div className="text-sm text-foreground/70">
+                    5% fee per transaction - only pay when you transact
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </GlassCard>
+            </GlassCard>
+          </TabsContent>
+
+          {/* Lender View */}
+          <TabsContent value="lender" className="space-y-6 mt-6">
+            {/* Incoming Requests */}
+            {user && <IncomingHandshakeRequests userId={user.id} />}
+
+            {/* Expected Income */}
+            {user && <ExpectedIncomeTracker userId={user.id} />}
+
+            {/* Lending Analytics */}
+            {user && <LendingAnalytics userId={user.id} />}
+
+            {/* Pay-as-you-go Info */}
+            <GlassCard className="bg-gradient-to-r from-primary/20 to-secondary/20 border-secondary/30">
+              <div className="flex items-center gap-4">
+                <HandshakeIcon className="w-10 h-10 text-secondary" />
+                <div className="flex-1">
+                  <div className="font-semibold mb-1">Earn as you lend</div>
+                  <div className="text-sm text-foreground/70">
+                    Requesters pay a 5% transaction fee on each loan
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+          </TabsContent>
+        </Tabs>
 
         {/* Active Handshakes */}
         {activeHandshakes.length > 0 && (
