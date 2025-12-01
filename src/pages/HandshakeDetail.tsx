@@ -20,6 +20,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PaymentDialog } from "@/components/PaymentDialog";
 import { PaymentHistory } from "@/components/PaymentHistory";
+import { PenaltySetupDialog } from "@/components/PenaltySetupDialog";
+import { PaymentSimulationDialog } from "@/components/PaymentSimulationDialog";
 
 interface HandshakeData {
   id: string;
@@ -37,6 +39,9 @@ interface HandshakeData {
   penalty_accepted: boolean;
   transaction_fee: number;
   amount_paid: number;
+  payment_status: 'pending' | 'processing' | 'completed' | 'failed';
+  payment_initiated_at: string | null;
+  payment_completed_at: string | null;
   requester: {
     full_name: string;
     unique_code: string;
@@ -55,6 +60,9 @@ const HandshakeDetail = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [penaltyDialogOpen, setPenaltyDialogOpen] = useState(false);
+  const [paymentSimDialogOpen, setPaymentSimDialogOpen] = useState(false);
+  const [pendingPenalty, setPendingPenalty] = useState<any>(null);
 
   useEffect(() => {
     if (!user) {
@@ -87,27 +95,78 @@ const HandshakeDetail = () => {
     }
   };
 
-  const handleApprove = async () => {
+  const handleApproveClick = () => {
+    // Open penalty setup dialog
+    setPenaltyDialogOpen(true);
+  };
+
+  const handlePenaltyConfirm = async (penalty: any) => {
     if (!handshake) return;
+
+    setPenaltyDialogOpen(false);
+    setPendingPenalty(penalty);
 
     setActionLoading(true);
 
     try {
-      // Update handshake status
+      // Update handshake with penalty terms
       const { error: updateError } = await supabase
         .from('handshakes')
-        .update({ status: 'approved' })
+        .update({ 
+          penalty_enabled: penalty.enabled,
+          penalty_type: penalty.type,
+          penalty_amount: penalty.amount,
+          grace_period_days: penalty.gracePeriodDays,
+          penalty_accepted: !penalty.enabled, // Auto-accept if no penalty
+        })
         .eq('id', handshake.id);
 
       if (updateError) throw updateError;
 
-      // Get requester's email
+      // If no penalty, proceed to payment directly
+      if (!penalty.enabled) {
+        setPaymentSimDialogOpen(true);
+      } else {
+        toast.success("Penalty terms set", {
+          description: "Waiting for requester to accept terms",
+        });
+        fetchHandshake();
+      }
+    } catch (error: any) {
+      toast.error("Error setting penalty terms", {
+        description: error.message,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
+    if (!handshake) return;
+
+    setPaymentSimDialogOpen(false);
+    setActionLoading(true);
+
+    try {
+      // Update handshake with payment completion
+      const { error: updateError } = await supabase
+        .from('handshakes')
+        .update({ 
+          status: 'approved',
+          payment_status: 'completed',
+          payment_initiated_at: new Date().toISOString(),
+          payment_completed_at: new Date().toISOString(),
+        })
+        .eq('id', handshake.id);
+
+      if (updateError) throw updateError;
+
+      // Get requester's email and send notification
       const { data: { user: requesterUser }, error: userError } = await supabase.auth.admin.getUserById(
         handshake.requester_id
       );
 
       if (!userError && requesterUser?.email) {
-        // Send approval notification
         try {
           await supabase.functions.invoke('send-handshake-notification', {
             body: {
@@ -127,10 +186,10 @@ const HandshakeDetail = () => {
         }
       }
 
-      toast.success("Handshake approved!");
+      toast.success("Payment completed! Handshake approved!");
       fetchHandshake();
     } catch (error: any) {
-      toast.error("Error approving handshake", {
+      toast.error("Error completing payment", {
         description: error.message,
       });
     } finally {
@@ -230,6 +289,7 @@ const HandshakeDetail = () => {
   const isRequester = user?.id === handshake.requester_id;
   const isPending = handshake.status === 'pending';
   const needsPenaltyAcceptance = handshake.penalty_enabled && !handshake.penalty_accepted && isRequester && isPending;
+  const needsPayment = isSupporter && isPending && handshake.penalty_accepted && handshake.payment_status === 'pending';
   
   // Calculate outstanding balance
   const totalDue = handshake.amount + (handshake.transaction_fee || 0) + (handshake.late_fee || 0);
@@ -453,16 +513,28 @@ const HandshakeDetail = () => {
             </GlassCard>
           )}
 
+          {/* Supporter needs to make payment */}
+          {needsPayment && (
+            <Button
+              onClick={() => setPaymentSimDialogOpen(true)}
+              disabled={actionLoading}
+              className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <Wallet className="w-5 h-5 mr-2" />
+              Make Payment (R {(handshake.amount + handshake.transaction_fee).toFixed(2)})
+            </Button>
+          )}
+
           {/* Supporter pending actions */}
-          {isSupporter && isPending && !needsPenaltyAcceptance && (
+          {isSupporter && isPending && !needsPenaltyAcceptance && !needsPayment && (
             <div className="grid grid-cols-2 gap-3">
               <Button
-                onClick={handleApprove}
+                onClick={handleApproveClick}
                 disabled={actionLoading}
                 className="bg-gradient-to-r from-green-500 to-green-600 hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               >
                 <Check className="w-5 h-5 mr-2" />
-                {actionLoading ? "Approving..." : "Approve"}
+                {actionLoading ? "Processing..." : "Approve & Set Terms"}
               </Button>
 
               <Button
@@ -505,13 +577,29 @@ const HandshakeDetail = () => {
         </div>
       </div>
 
-      {/* Payment Dialog */}
+      {/* Dialogs */}
       <PaymentDialog
         open={paymentDialogOpen}
         onOpenChange={setPaymentDialogOpen}
         handshakeId={handshake.id}
         outstandingBalance={outstandingBalance}
         onPaymentSuccess={fetchHandshake}
+      />
+
+      <PenaltySetupDialog
+        open={penaltyDialogOpen}
+        onClose={() => setPenaltyDialogOpen(false)}
+        onConfirm={handlePenaltyConfirm}
+        amount={handshake.amount}
+      />
+
+      <PaymentSimulationDialog
+        open={paymentSimDialogOpen}
+        onClose={() => setPaymentSimDialogOpen(false)}
+        onSuccess={handlePaymentSuccess}
+        amount={handshake.amount}
+        transactionFee={handshake.transaction_fee}
+        recipientName={handshake.requester.full_name}
       />
     </div>
   );

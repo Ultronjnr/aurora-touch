@@ -26,6 +26,9 @@ export type Database = {
           id: string
           late_fee: number | null
           payback_day: string
+          payment_completed_at: string | null
+          payment_initiated_at: string | null
+          payment_status: string | null
           penalty_accepted: boolean | null
           penalty_amount: number | null
           penalty_enabled: boolean | null
@@ -47,6 +50,9 @@ export type Database = {
           id?: string
           late_fee?: number | null
           payback_day: string
+          payment_completed_at?: string | null
+          payment_initiated_at?: string | null
+          payment_status?: string | null
           penalty_accepted?: boolean | null
           penalty_amount?: number | null
           penalty_enabled?: boolean | null
@@ -68,6 +74,9 @@ export type Database = {
           id?: string
           late_fee?: number | null
           payback_day?: string
+          payment_completed_at?: string | null
+          payment_initiated_at?: string | null
+          payment_status?: string | null
           penalty_accepted?: boolean | null
           penalty_amount?: number | null
           penalty_enabled?: boolean | null
