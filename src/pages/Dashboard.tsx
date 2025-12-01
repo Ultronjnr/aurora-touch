@@ -25,6 +25,7 @@ import { CashRatingBreakdown } from "@/components/CashRatingBreakdown";
 import { IncomingHandshakeRequests } from "@/components/IncomingHandshakeRequests";
 import { ExpectedIncomeTracker } from "@/components/ExpectedIncomeTracker";
 import { LendingAnalytics } from "@/components/LendingAnalytics";
+import { NotificationBell } from "@/components/NotificationBell";
 
 interface Profile {
   unique_code: string;
@@ -164,6 +165,7 @@ const Dashboard = () => {
             <div className="text-xs text-foreground/60">Your Code</div>
             <div className="font-mono font-bold text-secondary">{profile?.unique_code}</div>
           </div>
+          <NotificationBell />
           <Button
             variant="ghost"
             size="icon"

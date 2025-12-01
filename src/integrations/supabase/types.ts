@@ -97,29 +97,38 @@ export type Database = {
       }
       notifications: {
         Row: {
+          action_url: string | null
+          data: Json | null
           handshake_id: string | null
           id: string
           message: string
           read: boolean | null
           sent_at: string | null
+          title: string
           type: string | null
           user_id: string
         }
         Insert: {
+          action_url?: string | null
+          data?: Json | null
           handshake_id?: string | null
           id?: string
           message: string
           read?: boolean | null
           sent_at?: string | null
+          title?: string
           type?: string | null
           user_id: string
         }
         Update: {
+          action_url?: string | null
+          data?: Json | null
           handshake_id?: string | null
           id?: string
           message?: string
           read?: boolean | null
           sent_at?: string | null
+          title?: string
           type?: string | null
           user_id?: string
         }
@@ -263,6 +272,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_overdue_payments: { Args: never; Returns: undefined }
+      check_payment_reminders: { Args: never; Returns: undefined }
       generate_unique_code: { Args: never; Returns: string }
       get_outstanding_balance: {
         Args: { handshake_id: string }
