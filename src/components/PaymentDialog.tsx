@@ -1,0 +1,197 @@
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { DollarSign } from "lucide-react";
+
+interface PaymentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  handshakeId: string;
+  outstandingBalance: number;
+  onPaymentSuccess: () => void;
+}
+
+export const PaymentDialog = ({ 
+  open, 
+  onOpenChange, 
+  handshakeId, 
+  outstandingBalance,
+  onPaymentSuccess 
+}: PaymentDialogProps) => {
+  const [amount, setAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handlePayment = async () => {
+    const paymentAmount = parseFloat(amount);
+    
+    if (!paymentAmount || paymentAmount <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    if (paymentAmount > outstandingBalance) {
+      toast.error("Payment amount cannot exceed outstanding balance");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Record the payment
+      const { error } = await supabase
+        .from('payments')
+        .insert({
+          handshake_id: handshakeId,
+          amount: paymentAmount,
+          payment_status: 'completed',
+          payment_method: 'manual', // In production, integrate with payment gateway
+          transaction_reference: `PAY-${Date.now()}`,
+        });
+
+      if (error) throw error;
+
+      toast.success("Payment recorded successfully!", {
+        description: `Paid R ${paymentAmount.toFixed(2)}`,
+      });
+
+      setAmount("");
+      onOpenChange(false);
+      onPaymentSuccess();
+    } catch (error: any) {
+      toast.error("Error recording payment", {
+        description: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickAmount = (percentage: number) => {
+    const quickAmount = (outstandingBalance * percentage).toFixed(2);
+    setAmount(quickAmount);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="glass border-border/50">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-secondary" />
+            Make Payment
+          </DialogTitle>
+          <DialogDescription>
+            Enter the amount you want to pay. You can make partial payments.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-4">
+          {/* Outstanding Balance */}
+          <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/30">
+            <div className="text-sm text-foreground/60 mb-1">Outstanding Balance</div>
+            <div className="text-3xl font-bold gradient-text">
+              R {outstandingBalance.toFixed(2)}
+            </div>
+          </div>
+
+          {/* Quick Amount Buttons */}
+          <div className="space-y-2">
+            <Label className="text-sm text-foreground/60">Quick amounts</Label>
+            <div className="grid grid-cols-4 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickAmount(0.25)}
+                className="hover:bg-secondary/20 hover:border-secondary/50"
+              >
+                25%
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickAmount(0.50)}
+                className="hover:bg-secondary/20 hover:border-secondary/50"
+              >
+                50%
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickAmount(0.75)}
+                className="hover:bg-secondary/20 hover:border-secondary/50"
+              >
+                75%
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickAmount(1.00)}
+                className="hover:bg-secondary/20 hover:border-secondary/50"
+              >
+                100%
+              </Button>
+            </div>
+          </div>
+
+          {/* Amount Input */}
+          <div className="space-y-2">
+            <Label htmlFor="payment-amount">Payment Amount (ZAR)</Label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/60 text-lg">
+                R
+              </span>
+              <Input
+                id="payment-amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={outstandingBalance}
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="pl-10 text-lg bg-input/50 border-border/50"
+              />
+            </div>
+            <p className="text-xs text-foreground/60">
+              Maximum: R {outstandingBalance.toFixed(2)}
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1"
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handlePayment}
+              disabled={loading || !amount || parseFloat(amount) <= 0}
+              className="flex-1 bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white"
+            >
+              {loading ? "Processing..." : "Pay Now"}
+            </Button>
+          </div>
+
+          <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
+            <p className="text-xs text-foreground/60">
+              💡 You can make multiple partial payments until the full amount is paid.
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
