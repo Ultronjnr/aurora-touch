@@ -27,6 +27,11 @@ interface HandshakeData {
   late_fee: number;
   requester_id: string;
   supporter_id: string;
+  penalty_enabled: boolean;
+  penalty_type: 'fixed' | 'percentage' | null;
+  penalty_amount: number;
+  grace_period_days: number;
+  penalty_accepted: boolean;
   requester: {
     full_name: string;
     unique_code: string;
@@ -151,6 +156,54 @@ const HandshakeDetail = () => {
     }
   };
 
+  const handleAcceptPenalty = async () => {
+    if (!handshake) return;
+
+    setActionLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('handshakes')
+        .update({ penalty_accepted: true })
+        .eq('id', handshake.id);
+
+      if (error) throw error;
+
+      toast.success("Penalty terms accepted");
+      fetchHandshake();
+    } catch (error: any) {
+      toast.error("Error accepting penalty", {
+        description: error.message,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeclinePenalty = async () => {
+    if (!handshake) return;
+
+    setActionLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('handshakes')
+        .update({ status: 'rejected' })
+        .eq('id', handshake.id);
+
+      if (error) throw error;
+
+      toast.success("Penalty terms declined. Handshake rejected.");
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast.error("Error declining penalty", {
+        description: error.message,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -168,7 +221,9 @@ const HandshakeDetail = () => {
   const daysUntilDue = Math.ceil((paybackDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   const progressPercent = daysUntilDue > 0 ? ((30 - daysUntilDue) / 30) * 100 : 100;
   const isSupporter = user?.id === handshake.supporter_id;
+  const isRequester = user?.id === handshake.requester_id;
   const isPending = handshake.status === 'pending';
+  const needsPenaltyAcceptance = handshake.penalty_enabled && !handshake.penalty_accepted && isRequester && isPending;
 
   return (
     <div className="min-h-screen p-6">
@@ -257,6 +312,41 @@ const HandshakeDetail = () => {
           </GlassCard>
         </div>
 
+        {/* Penalty Agreement Card */}
+        {handshake.penalty_enabled && (
+          <GlassCard className="bg-yellow-500/5 border-yellow-500/30 animate-slide-up" style={{ animationDelay: "0.15s" }}>
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="w-5 h-5 text-yellow-500" />
+              <h3 className="font-semibold">Penalty Agreement</h3>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-foreground/60">Type:</span>
+                <span className="font-medium capitalize">{handshake.penalty_type}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-foreground/60">Amount:</span>
+                <span className="font-medium">
+                  {handshake.penalty_type === 'fixed' 
+                    ? `R ${handshake.penalty_amount.toFixed(2)} per day` 
+                    : `${handshake.penalty_amount.toFixed(1)}% per day`
+                  }
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-foreground/60">Grace Period:</span>
+                <span className="font-medium">{handshake.grace_period_days} days</span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-border/30">
+                <span className="text-foreground/60">Status:</span>
+                <span className={`font-medium ${handshake.penalty_accepted ? 'text-green-400' : 'text-yellow-500'}`}>
+                  {handshake.penalty_accepted ? '✓ Accepted' : '⏳ Pending Acceptance'}
+                </span>
+              </div>
+            </div>
+          </GlassCard>
+        )}
+
         {/* Impact Cards */}
         <div className="grid grid-cols-2 gap-4">
           <GlassCard className="animate-slide-in-left" style={{ animationDelay: "0.1s" }}>
@@ -282,8 +372,41 @@ const HandshakeDetail = () => {
 
         {/* Action Buttons */}
         <div className="space-y-3 pt-4">
+          {/* Requester penalty acceptance */}
+          {needsPenaltyAcceptance && (
+            <GlassCard className="bg-yellow-500/10 border-yellow-500/30 space-y-3">
+              <div className="flex items-center gap-2 text-yellow-500">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-semibold">Penalty Terms Require Your Acceptance</span>
+              </div>
+              <p className="text-sm text-foreground/70">
+                The supporter has set penalty terms for late payment. Please review and accept to proceed with this handshake.
+              </p>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <Button
+                  onClick={handleAcceptPenalty}
+                  disabled={actionLoading}
+                  className="bg-gradient-to-r from-green-500 to-green-600 hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                >
+                  <Check className="w-5 h-5 mr-2" />
+                  {actionLoading ? "Accepting..." : "Accept Terms"}
+                </Button>
+
+                <Button
+                  onClick={handleDeclinePenalty}
+                  disabled={actionLoading}
+                  variant="outline"
+                  className="border-destructive/50 text-destructive hover:bg-destructive/10 py-6 rounded-xl transition-all"
+                >
+                  <X className="w-5 h-5 mr-2" />
+                  Decline
+                </Button>
+              </div>
+            </GlassCard>
+          )}
+
           {/* Supporter pending actions */}
-          {isSupporter && isPending && (
+          {isSupporter && isPending && !needsPenaltyAcceptance && (
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={handleApprove}
@@ -307,7 +430,7 @@ const HandshakeDetail = () => {
           )}
 
           {/* Requester payment button */}
-          {!isSupporter && (handshake.status === 'approved' || handshake.status === 'active') && (
+          {isRequester && !needsPenaltyAcceptance && (handshake.status === 'approved' || handshake.status === 'active') && (
             <Button
               className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
             >

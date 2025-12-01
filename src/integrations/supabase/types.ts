@@ -21,9 +21,14 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           days_late: number | null
+          grace_period_days: number | null
           id: string
           late_fee: number | null
           payback_day: string
+          penalty_accepted: boolean | null
+          penalty_amount: number | null
+          penalty_enabled: boolean | null
+          penalty_type: string | null
           requester_id: string
           status: string | null
           supporter_id: string
@@ -36,9 +41,14 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           days_late?: number | null
+          grace_period_days?: number | null
           id?: string
           late_fee?: number | null
           payback_day: string
+          penalty_accepted?: boolean | null
+          penalty_amount?: number | null
+          penalty_enabled?: boolean | null
+          penalty_type?: string | null
           requester_id: string
           status?: string | null
           supporter_id: string
@@ -51,9 +61,14 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           days_late?: number | null
+          grace_period_days?: number | null
           id?: string
           late_fee?: number | null
           payback_day?: string
+          penalty_accepted?: boolean | null
+          penalty_amount?: number | null
+          penalty_enabled?: boolean | null
+          penalty_type?: string | null
           requester_id?: string
           status?: string | null
           supporter_id?: string
