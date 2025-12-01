@@ -10,13 +10,15 @@ import {
   Calendar, 
   CheckCircle2, 
   Clock, 
-  AlertCircle,
-  Crown
+  AlertCircle
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import logo from "@/assets/cashme-logo.png";
+import { UpcomingPayments } from "@/components/UpcomingPayments";
+import { BorrowerAnalytics } from "@/components/BorrowerAnalytics";
+import { CashRatingBreakdown } from "@/components/CashRatingBreakdown";
 
 interface Profile {
   unique_code: string;
@@ -182,6 +184,17 @@ const Dashboard = () => {
             {(profile?.cash_rating || 100) >= 90 ? "Excellent rating!" : "Keep building your rating"}
           </div>
         </GlassCard>
+
+        {/* Upcoming Payments - Requester only */}
+        {user && <UpcomingPayments userId={user.id} />}
+
+        {/* Borrower Analytics - Requester only */}
+        {user && <BorrowerAnalytics userId={user.id} />}
+
+        {/* Cash Rating Breakdown */}
+        {user && profile && (
+          <CashRatingBreakdown userId={user.id} cashRating={profile.cash_rating || 100} />
+        )}
 
         {/* Pay-as-you-go Info */}
         <GlassCard className="bg-gradient-to-r from-primary/20 to-secondary/20 border-secondary/30 animate-slide-in-right">
