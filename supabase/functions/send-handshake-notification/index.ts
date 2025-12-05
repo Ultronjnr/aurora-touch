@@ -10,10 +10,11 @@ const corsHeaders = {
 };
 
 interface NotificationRequest {
-  type: "handshake_request" | "handshake_approved" | "handshake_rejected" | "payment_reminder" | "payment_received" | "payment_overdue" | "penalty_notification";
+  type: "handshake_request" | "handshake_approved" | "handshake_rejected" | "payment_reminder" | "payment_received" | "payment_overdue" | "penalty_notification" | "payment_reminder_3_days" | "payment_reminder_2_days" | "payment_reminder_due_today";
   handshakeId: string;
   recipientEmail: string;
   recipientName: string;
+  recipientPhone?: string;
   data: {
     amount?: number;
     requesterName?: string;
@@ -24,7 +25,97 @@ interface NotificationRequest {
     paymentAmount?: number;
     daysOverdue?: number;
     penaltyAmount?: number;
+    daysUntilDue?: number;
   };
+}
+
+// Africa's Talking SMS sender
+async function sendSMS(phoneNumber: string, message: string): Promise<boolean> {
+  const apiKey = Deno.env.get("AFRICAS_TALKING_API_KEY");
+  const username = Deno.env.get("AFRICAS_TALKING_USERNAME");
+
+  if (!apiKey || !username) {
+    console.log("Africa's Talking credentials not configured, skipping SMS");
+    return false;
+  }
+
+  try {
+    // Format phone number for South Africa if needed
+    let formattedPhone = phoneNumber;
+    if (phoneNumber.startsWith("0")) {
+      formattedPhone = "+27" + phoneNumber.substring(1);
+    } else if (!phoneNumber.startsWith("+")) {
+      formattedPhone = "+" + phoneNumber;
+    }
+
+    const response = await fetch("https://api.africastalking.com/version1/messaging", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "apiKey": apiKey,
+        "Accept": "application/json",
+      },
+      body: new URLSearchParams({
+        username: username,
+        to: formattedPhone,
+        message: message,
+        from: "CashMe",
+      }),
+    });
+
+    const result = await response.json();
+    console.log("SMS send result:", JSON.stringify(result));
+    
+    if (result.SMSMessageData?.Recipients?.[0]?.status === "Success") {
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error("Error sending SMS:", error);
+    return false;
+  }
+}
+
+// Get SMS content based on notification type
+function getSMSContent(type: string, recipientName: string, data: NotificationRequest["data"]): string {
+  const firstName = recipientName.split(" ")[0];
+  
+  switch (type) {
+    case "payment_reminder_3_days":
+      return `Hi ${firstName}, your CashMe payment of R${data.amount?.toFixed(2)} to ${data.supporterName} is due in 3 days (${new Date(data.paybackDate!).toLocaleDateString('en-ZA')}). Pay on time to maintain your cash rating!`;
+    
+    case "payment_reminder_2_days":
+      return `Hi ${firstName}, REMINDER: Your CashMe payment of R${data.amount?.toFixed(2)} to ${data.supporterName} is due in 2 days. Login to make your payment now.`;
+    
+    case "payment_reminder_due_today":
+      return `Hi ${firstName}, URGENT: Your CashMe payment of R${data.amount?.toFixed(2)} to ${data.supporterName} is DUE TODAY. Pay now to avoid late fees and protect your cash rating!`;
+    
+    case "payment_reminder":
+      const daysLate = data.daysLate || 0;
+      if (daysLate > 0) {
+        return `Hi ${firstName}, your CashMe payment is ${daysLate} days OVERDUE! Please pay R${data.amount?.toFixed(2)} to ${data.supporterName} immediately to avoid further penalties.`;
+      }
+      return `Hi ${firstName}, reminder: CashMe payment of R${data.amount?.toFixed(2)} to ${data.supporterName} is due on ${new Date(data.paybackDate!).toLocaleDateString('en-ZA')}.`;
+    
+    case "handshake_request":
+      return `Hi ${firstName}, you have a new CashMe handshake request from ${data.requesterName} for R${data.amount?.toFixed(2)}. Login to approve or decline.`;
+    
+    case "handshake_approved":
+      return `Great news ${firstName}! Your CashMe request of R${data.amount?.toFixed(2)} was approved by ${data.supporterName}. Payback due: ${new Date(data.paybackDate!).toLocaleDateString('en-ZA')}.`;
+    
+    case "handshake_rejected":
+      return `Hi ${firstName}, your CashMe request to ${data.supporterName} for R${data.amount?.toFixed(2)} was declined. Try another supporter.`;
+    
+    case "payment_received":
+      return `Hi ${firstName}, you received a CashMe payment of R${data.paymentAmount?.toFixed(2)} from ${data.requesterName}. Check your dashboard for details.`;
+    
+    case "penalty_notification":
+      return `Hi ${firstName}, a late fee of R${data.penaltyAmount?.toFixed(2)} has been added to your CashMe payment (${data.daysOverdue} days overdue). Total now due: R${data.amount?.toFixed(2)}.`;
+    
+    default:
+      return `Hi ${firstName}, you have a new notification on CashMe. Login to view details.`;
+  }
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -33,14 +124,24 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { type, recipientEmail, recipientName, data }: NotificationRequest = await req.json();
+    const { type, recipientEmail, recipientName, recipientPhone, data }: NotificationRequest = await req.json();
 
-    console.log("Sending email notification:", { type, recipientEmail });
+    console.log("Sending notification:", { type, recipientEmail, recipientPhone: recipientPhone ? "****" + recipientPhone.slice(-4) : "none" });
 
     let emailContent = {
       subject: "",
       html: "",
     };
+
+    // Determine reminder type for email subject/content
+    const getReminderLabel = () => {
+      if (type === "payment_reminder_3_days") return "3 Days Until Due";
+      if (type === "payment_reminder_2_days") return "2 Days Until Due";
+      if (type === "payment_reminder_due_today") return "Payment Due Today";
+      return null;
+    };
+
+    const reminderLabel = getReminderLabel();
 
     switch (type) {
       case "handshake_request":
@@ -155,24 +256,43 @@ const handler = async (req: Request): Promise<Response> => {
         break;
 
       case "payment_reminder":
+      case "payment_reminder_3_days":
+      case "payment_reminder_2_days":
+      case "payment_reminder_due_today":
         const daysLate = data.daysLate || 0;
         const isOverdue = daysLate > 0;
+        const isDueToday = type === "payment_reminder_due_today";
+        
+        let urgencyColor = "#f59e0b"; // yellow for normal reminder
+        let urgencyLabel = reminderLabel || "Payment Reminder";
+        
+        if (isOverdue) {
+          urgencyColor = "#ef4444"; // red for overdue
+          urgencyLabel = `${daysLate} Day${daysLate > 1 ? 's' : ''} Overdue`;
+        } else if (isDueToday) {
+          urgencyColor = "#ef4444"; // red for due today
+        } else if (type === "payment_reminder_2_days") {
+          urgencyColor = "#f59e0b"; // orange for 2 days
+        } else if (type === "payment_reminder_3_days") {
+          urgencyColor = "#06b6d4"; // cyan for 3 days
+        }
         
         emailContent = {
-          subject: isOverdue ? "⚠️ Overdue Payment Reminder - CashMe" : "Payment Reminder - CashMe",
+          subject: isOverdue ? "⚠️ OVERDUE Payment - CashMe" : isDueToday ? "🔴 Payment Due TODAY - CashMe" : `🔔 ${urgencyLabel} - CashMe`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
-              <div style="background: ${isOverdue ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'}; padding: 30px; border-radius: 12px; text-align: center;">
+              <div style="background: linear-gradient(135deg, ${urgencyColor} 0%, ${urgencyColor}dd 100%); padding: 30px; border-radius: 12px; text-align: center;">
                 <h1 style="color: white; margin: 0; font-size: 28px;">CashMe</h1>
+                <p style="color: white; margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">${urgencyLabel}</p>
               </div>
               
               <div style="background: white; padding: 30px; border-radius: 12px; margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 <div style="text-align: center; margin-bottom: 20px;">
-                  <span style="font-size: 64px;">${isOverdue ? '⚠️' : '🔔'}</span>
+                  <span style="font-size: 64px;">${isOverdue ? '⚠️' : isDueToday ? '🔴' : '🔔'}</span>
                 </div>
                 
                 <h2 style="color: #1f2937; margin-top: 0; text-align: center;">
-                  ${isOverdue ? 'Overdue Payment Notice' : 'Payment Reminder'}
+                  ${isOverdue ? 'Overdue Payment Notice' : isDueToday ? 'Payment Due Today!' : urgencyLabel}
                 </h2>
                 
                 <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
@@ -182,13 +302,19 @@ const handler = async (req: Request): Promise<Response> => {
                 <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
                   ${isOverdue 
                     ? `Your payment to <strong>${data.supporterName}</strong> is now <strong style="color: #ef4444;">${daysLate} day${daysLate > 1 ? 's' : ''} overdue</strong>.`
+                    : isDueToday
+                    ? `Your payment to <strong>${data.supporterName}</strong> is <strong style="color: #ef4444;">due today</strong>. Please make your payment now to avoid late fees.`
+                    : type === "payment_reminder_2_days"
+                    ? `Your payment to <strong>${data.supporterName}</strong> is due in <strong style="color: #f59e0b;">2 days</strong>. Plan ahead to ensure on-time payment.`
+                    : type === "payment_reminder_3_days"
+                    ? `Your payment to <strong>${data.supporterName}</strong> is due in <strong style="color: #06b6d4;">3 days</strong>. This is a friendly early reminder.`
                     : `This is a friendly reminder that you have a payment due to <strong>${data.supporterName}</strong>.`
                   }
                 </p>
                 
-                <div style="background: ${isOverdue ? '#fef2f2' : '#fef3c7'}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid ${isOverdue ? '#ef4444' : '#f59e0b'};">
+                <div style="background: ${isOverdue || isDueToday ? '#fef2f2' : type === "payment_reminder_3_days" ? '#ecfeff' : '#fef3c7'}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid ${urgencyColor};">
                   <p style="margin: 0; color: #6b7280; font-size: 14px;">Amount Due</p>
-                  <p style="margin: 5px 0; color: ${isOverdue ? '#ef4444' : '#f59e0b'}; font-size: 32px; font-weight: bold;">R ${data.amount}</p>
+                  <p style="margin: 5px 0; color: ${urgencyColor}; font-size: 32px; font-weight: bold;">R ${data.amount?.toFixed(2)}</p>
                   <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 14px;">
                     Due Date: ${new Date(data.paybackDate!).toLocaleDateString('en-ZA', { 
                       year: 'numeric', 
@@ -204,6 +330,12 @@ const handler = async (req: Request): Promise<Response> => {
                       <strong>Warning:</strong> Late payments affect your cash rating and may incur additional fees.
                     </p>
                   </div>
+                ` : isDueToday ? `
+                  <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0; color: #991b1b; font-size: 14px;">
+                      <strong>Act Now:</strong> Pay today to avoid late fees and protect your cash rating!
+                    </p>
+                  </div>
                 ` : `
                   <div style="background: #dbeafe; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0; border-radius: 4px;">
                     <p style="margin: 0; color: #075985; font-size: 14px;">
@@ -214,8 +346,8 @@ const handler = async (req: Request): Promise<Response> => {
                 
                 <div style="text-align: center; margin-top: 30px;">
                   <a href="${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app') || 'https://app.cashme.com'}/dashboard" 
-                     style="display: inline-block; background: ${isOverdue ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'}; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                    Make Payment
+                     style="display: inline-block; background: linear-gradient(135deg, ${urgencyColor} 0%, ${urgencyColor}dd 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                    Make Payment Now
                   </a>
                 </div>
               </div>
@@ -337,16 +469,15 @@ const handler = async (req: Request): Promise<Response> => {
                 </p>
                 
                 <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #f59e0b;">
-                  <p style="margin: 0; color: #6b7280; font-size: 14px;">Penalty Amount</p>
-                  <p style="margin: 5px 0; color: #f59e0b; font-size: 32px; font-weight: bold;">R ${data.penaltyAmount}</p>
-                  <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 14px;">
-                    Days Overdue: ${data.daysOverdue}
-                  </p>
+                  <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px;">Days Overdue</p>
+                  <p style="margin: 0 0 15px 0; color: #f59e0b; font-size: 24px; font-weight: bold;">${data.daysOverdue} days</p>
+                  <p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">Penalty Amount</p>
+                  <p style="margin: 0; color: #ef4444; font-size: 24px; font-weight: bold;">R ${data.penaltyAmount?.toFixed(2)}</p>
                 </div>
                 
                 <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px;">
                   <p style="margin: 0; color: #991b1b; font-size: 14px;">
-                    <strong>Important:</strong> This penalty has been added to your outstanding balance. Please make payment soon to avoid further penalties.
+                    <strong>Action Required:</strong> Please make your payment as soon as possible to avoid further penalties and protect your cash rating.
                   </p>
                 </div>
                 
@@ -367,11 +498,20 @@ const handler = async (req: Request): Promise<Response> => {
         break;
 
       default:
-        throw new Error("Invalid notification type");
+        emailContent = {
+          subject: "Notification from CashMe",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1>Hello ${recipientName}</h1>
+              <p>You have a new notification on CashMe.</p>
+            </div>
+          `,
+        };
     }
 
+    // Send email
     const emailResponse = await resend.emails.send({
-      from: "CashMe <onboarding@resend.dev>",
+      from: "CashMe <notifications@resend.dev>",
       to: [recipientEmail],
       subject: emailContent.subject,
       html: emailContent.html,
@@ -379,17 +519,32 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Email sent successfully:", emailResponse);
 
-    return new Response(JSON.stringify({ success: true, data: emailResponse }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
-    });
+    // Send SMS if phone number is provided
+    let smsSent = false;
+    if (recipientPhone) {
+      const smsContent = getSMSContent(type, recipientName, data);
+      smsSent = await sendSMS(recipientPhone, smsContent);
+      console.log("SMS sent:", smsSent);
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        emailId: emailResponse.data?.id,
+        smsSent 
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
   } catch (error: any) {
     console.error("Error in send-handshake-notification function:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ error: error.message }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
