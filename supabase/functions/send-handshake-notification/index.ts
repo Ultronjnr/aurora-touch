@@ -31,8 +31,8 @@ interface NotificationRequest {
 
 // Africa's Talking SMS sender
 async function sendSMS(phoneNumber: string, message: string): Promise<boolean> {
-  const apiKey = Deno.env.get("AFRICAS_TALKING_API_KEY");
-  const username = Deno.env.get("AFRICAS_TALKING_USERNAME");
+  const apiKey = Deno.env.get("AFRICAS_TALKING_API_KEY")?.trim();
+  const username = Deno.env.get("AFRICAS_TALKING_USERNAME")?.trim();
 
   if (!apiKey || !username) {
     console.log("Africa's Talking credentials not configured, skipping SMS");
@@ -48,7 +48,15 @@ async function sendSMS(phoneNumber: string, message: string): Promise<boolean> {
       formattedPhone = "+" + phoneNumber;
     }
 
-    const response = await fetch("https://api.africastalking.com/version1/messaging", {
+    // Use sandbox URL for testing (change to production URL when going live)
+    const isSandbox = username.toLowerCase().includes("sandbox");
+    const apiUrl = isSandbox 
+      ? "https://api.sandbox.africastalking.com/version1/messaging"
+      : "https://api.africastalking.com/version1/messaging";
+
+    console.log(`Sending SMS to ${formattedPhone} via ${isSandbox ? 'sandbox' : 'production'} API (username: ${username})`);
+
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -59,15 +67,20 @@ async function sendSMS(phoneNumber: string, message: string): Promise<boolean> {
         username: username,
         to: formattedPhone,
         message: message,
-        from: "CashMe",
       }),
     });
 
-    const result = await response.json();
-    console.log("SMS send result:", JSON.stringify(result));
+    const responseText = await response.text();
+    console.log("SMS API response:", responseText);
     
-    if (result.SMSMessageData?.Recipients?.[0]?.status === "Success") {
-      return true;
+    try {
+      const result = JSON.parse(responseText);
+      if (result.SMSMessageData?.Recipients?.[0]?.status === "Success") {
+        return true;
+      }
+      console.log("SMS status:", result.SMSMessageData?.Recipients?.[0]?.status || "Unknown");
+    } catch {
+      console.log("SMS response was not JSON:", responseText);
     }
     
     return false;
