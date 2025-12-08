@@ -48,7 +48,7 @@ export const PaymentDialog = ({
           handshake_id: handshakeId,
           amount: paymentAmount,
           payment_status: 'completed',
-          payment_method: 'manual', // In production, integrate with payment gateway
+          payment_method: 'eft', // Valid payment method for database constraint
           transaction_reference: `PAY-${Date.now()}`,
         });
 
