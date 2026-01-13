@@ -4,24 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { GlassCard } from "@/components/GlassCard";
-import { ArrowLeft, Calendar as CalendarIcon, Search, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Search } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { validateAmount } from "@/lib/validation";
 
+// Minimal profile info for search - no banking details exposed
 interface Profile {
   id: string;
   unique_code: string;
   full_name: string;
-  account_number: string | null;
-  branch_code: string | null;
-  account_type: string | null;
-  phone: string | null;
+  cash_rating: number | null;
 }
 
 const CreateHandshake = () => {
@@ -54,9 +52,10 @@ const CreateHandshake = () => {
 
   const searchSupporters = async () => {
     try {
+      // Only fetch non-sensitive fields for search - no banking details
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, unique_code, full_name, account_number, branch_code, account_type, phone')
+        .select('id, unique_code, full_name, cash_rating')
         .neq('id', user?.id)
         .eq('kyc_completed', true) // Only show verified users
         .or(`unique_code.ilike.%${supporterSearch}%,full_name.ilike.%${supporterSearch}%`)
@@ -84,11 +83,19 @@ const CreateHandshake = () => {
       return;
     }
 
+    // Validate amount with proper number handling
+    const validation = validateAmount(amount, { min: 1, max: 1000000 });
+    if (!validation.isValid) {
+      toast.error(validation.error);
+      return;
+    }
+
+    const validatedAmount = validation.value!;
     setLoading(true);
 
     try {
-      // Calculate 5% transaction fee
-      const transactionFee = parseFloat(amount) * 0.05;
+      // Calculate 5% transaction fee using validated amount
+      const transactionFee = validatedAmount * 0.05;
       
       // Create handshake - supporter will set penalty terms during approval
       const { data: handshakeData, error: handshakeError } = await supabase
@@ -96,7 +103,7 @@ const CreateHandshake = () => {
         .insert({
           requester_id: user?.id,
           supporter_id: selectedSupporter.id,
-          amount: parseFloat(amount),
+          amount: validatedAmount,
           payback_day: format(paybackDay, 'yyyy-MM-dd'),
           auto_payback: autoPayback,
           status: 'pending',
@@ -123,7 +130,6 @@ const CreateHandshake = () => {
 
       // Send email notification to supporter
       try {
-        const transactionFee = parseFloat(amount) * 0.05;
         await supabase.functions.invoke('send-handshake-notification', {
           body: {
             type: 'handshake_request',
@@ -131,7 +137,7 @@ const CreateHandshake = () => {
             recipientEmail: user?.email, // In production, get supporter's email
             recipientName: supporterProfile?.full_name || 'Supporter',
             data: {
-              amount: parseFloat(amount),
+              amount: validatedAmount,
               requesterName: requesterProfile?.full_name || 'User',
               paybackDate: format(paybackDay, 'yyyy-MM-dd'),
               transactionFee: transactionFee,
@@ -241,15 +247,20 @@ const CreateHandshake = () => {
               )}
             </div>
 
-            {/* Selected Supporter - Full Banking Details */}
+            {/* Selected Supporter - Minimal info only */}
             {selectedSupporter && (
-              <GlassCard className="bg-secondary/10 border-secondary/30 space-y-4">
-                <div className="flex items-center justify-between border-b border-border/30 pb-3">
+              <GlassCard className="bg-secondary/10 border-secondary/30">
+                <div className="flex items-center justify-between">
                   <div>
                     <div className="font-bold text-lg">{selectedSupporter.full_name}</div>
                     <div className="text-sm text-foreground/60 font-mono">
                       Code: {selectedSupporter.unique_code}
                     </div>
+                    {selectedSupporter.cash_rating !== null && (
+                      <div className="text-sm text-foreground/60 mt-1">
+                        Cash Rating: {selectedSupporter.cash_rating}%
+                      </div>
+                    )}
                   </div>
                   <Button
                     type="button"
@@ -264,47 +275,9 @@ const CreateHandshake = () => {
                     Change
                   </Button>
                 </div>
-
-                {/* Banking Details Display */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-foreground/80 uppercase tracking-wide">
-                    Banking Information
-                  </h4>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <div className="text-xs text-foreground/60 uppercase">Account Number</div>
-                      <div className="font-mono font-medium text-sm">
-                        {selectedSupporter.account_number || "Not provided"}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-xs text-foreground/60 uppercase">Branch Code</div>
-                      <div className="font-mono font-medium text-sm">
-                        {selectedSupporter.branch_code || "Not provided"}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-xs text-foreground/60 uppercase">Account Type</div>
-                      <div className="font-medium text-sm capitalize">
-                        {selectedSupporter.account_type || "Not provided"}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-xs text-foreground/60 uppercase">Phone</div>
-                      <div className="font-medium text-sm">
-                        {selectedSupporter.phone || "Not provided"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-border/30">
+                <div className="pt-3 mt-3 border-t border-border/30">
                   <p className="text-xs text-foreground/60 italic">
-                    ✓ Verified user - All details confirmed through KYC
+                    ✓ Verified supporter selected
                   </p>
                 </div>
               </GlassCard>

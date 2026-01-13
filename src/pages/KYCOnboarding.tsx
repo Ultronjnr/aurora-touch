@@ -91,25 +91,60 @@ const KYCOnboarding = () => {
     if (!idFile || !user) return null;
 
     setUploading(true);
-    const fileExt = idFile.name.split(".").pop();
-    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-    const { error: uploadError, data } = await supabase.storage
-      .from("id-documents")
-      .upload(fileName, idFile);
+    try {
+      // Step 1: List existing files in user's folder to clean up old documents
+      const { data: existingFiles, error: listError } = await supabase.storage
+        .from('id-documents')
+        .list(user.id);
 
-    setUploading(false);
+      if (listError) {
+        console.error('Error listing existing files:', listError);
+        // Continue with upload even if list fails
+      }
 
-    if (uploadError) {
+      // Step 2: Delete all existing files to maintain data minimization
+      if (existingFiles && existingFiles.length > 0) {
+        const filesToDelete = existingFiles.map(f => `${user.id}/${f.name}`);
+        const { error: deleteError } = await supabase.storage
+          .from('id-documents')
+          .remove(filesToDelete);
+
+        if (deleteError) {
+          console.error('Error deleting old files:', deleteError);
+          // Continue with upload even if delete fails
+        }
+      }
+
+      // Step 3: Upload new file
+      const fileExt = idFile.name.split(".").pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("id-documents")
+        .upload(fileName, idFile);
+
+      setUploading(false);
+
+      if (uploadError) {
+        toast({
+          title: "Upload failed",
+          description: uploadError.message,
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      return fileName;
+    } catch (error) {
+      setUploading(false);
       toast({
         title: "Upload failed",
-        description: uploadError.message,
+        description: "An unexpected error occurred",
         variant: "destructive",
       });
       return null;
     }
-
-    return fileName;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

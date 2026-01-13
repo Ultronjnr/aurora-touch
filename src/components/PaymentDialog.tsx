@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DollarSign } from "lucide-react";
+import { validateAmount } from "@/lib/validation";
 
 interface PaymentDialogProps {
   open: boolean;
@@ -26,18 +27,18 @@ export const PaymentDialog = ({
   const [loading, setLoading] = useState(false);
 
   const handlePayment = async () => {
-    const paymentAmount = parseFloat(amount);
-    
-    if (!paymentAmount || paymentAmount <= 0) {
-      toast.error("Please enter a valid amount");
+    // Validate amount with comprehensive checks
+    const validation = validateAmount(amount, {
+      min: 0.01,
+      max: outstandingBalance
+    });
+
+    if (!validation.isValid) {
+      toast.error(validation.error);
       return;
     }
 
-    if (paymentAmount > outstandingBalance) {
-      toast.error("Payment amount cannot exceed outstanding balance");
-      return;
-    }
-
+    const paymentAmount = validation.value!;
     setLoading(true);
 
     try {
