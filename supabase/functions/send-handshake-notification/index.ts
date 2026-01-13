@@ -12,7 +12,8 @@ const corsHeaders = {
 interface NotificationRequest {
   type: "handshake_request" | "handshake_approved" | "handshake_rejected" | "payment_reminder" | "payment_received" | "payment_overdue" | "penalty_notification" | "payment_reminder_3_days" | "payment_reminder_2_days" | "payment_reminder_due_today";
   handshakeId: string;
-  recipientEmail: string;
+  recipientEmail?: string; // Optional - will be looked up from recipientId if not provided
+  recipientId?: string; // User ID - used to look up email server-side
   recipientName: string;
   recipientPhone?: string;
   data: {
@@ -137,9 +138,27 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { type, recipientEmail, recipientName, recipientPhone, data }: NotificationRequest = await req.json();
+    const { type, recipientEmail: providedEmail, recipientId, recipientName, recipientPhone, data }: NotificationRequest = await req.json();
 
-    console.log("Sending notification:", { type, recipientEmail, recipientPhone: recipientPhone ? "****" + recipientPhone.slice(-4) : "none" });
+    // Resolve recipient email - use provided email or look up from recipientId
+    let recipientEmail = providedEmail;
+    if (!recipientEmail && recipientId) {
+      // Use admin client to look up user email server-side
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+      
+      const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(recipientId);
+      if (userError) {
+        console.error("Error looking up user email:", userError);
+      } else if (userData?.user?.email) {
+        recipientEmail = userData.user.email;
+        console.log("Resolved email from recipientId");
+      }
+    }
+
+    console.log("Sending notification:", { type, hasEmail: !!recipientEmail, recipientPhone: recipientPhone ? "****" + recipientPhone.slice(-4) : "none" });
 
     let emailContent = {
       subject: "",
@@ -522,15 +541,19 @@ const handler = async (req: Request): Promise<Response> => {
         };
     }
 
-    // Send email
-    const emailResponse = await resend.emails.send({
-      from: "CashMe <notifications@resend.dev>",
-      to: [recipientEmail],
-      subject: emailContent.subject,
-      html: emailContent.html,
-    });
-
-    console.log("Email sent successfully:", emailResponse);
+    // Send email only if we have a recipient email
+    let emailResponse = null;
+    if (recipientEmail) {
+      emailResponse = await resend.emails.send({
+        from: "CashMe <notifications@resend.dev>",
+        to: [recipientEmail],
+        subject: emailContent.subject,
+        html: emailContent.html,
+      });
+      console.log("Email sent successfully:", emailResponse);
+    } else {
+      console.log("No recipient email available, skipping email notification");
+    }
 
     // Send SMS if phone number is provided
     let smsSent = false;
@@ -543,7 +566,8 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        emailId: emailResponse.data?.id,
+        emailId: emailResponse?.data?.id,
+        emailSent: !!recipientEmail,
         smsSent 
       }),
       {

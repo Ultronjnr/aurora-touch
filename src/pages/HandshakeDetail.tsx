@@ -161,29 +161,23 @@ const HandshakeDetail = () => {
 
       if (updateError) throw updateError;
 
-      // Get requester's email and send notification
-      const { data: { user: requesterUser }, error: userError } = await supabase.auth.admin.getUserById(
-        handshake.requester_id
-      );
-
-      if (!userError && requesterUser?.email) {
-        try {
-          await supabase.functions.invoke('send-handshake-notification', {
-            body: {
-              type: 'handshake_approved',
-              handshakeId: handshake.id,
-              recipientEmail: requesterUser.email,
-              recipientName: handshake.requester.full_name,
-              data: {
-                amount: handshake.amount,
-                supporterName: handshake.supporter.full_name,
-                paybackDate: handshake.payback_day,
-              }
+      // Send notification - email lookup handled server-side in Edge Function
+      try {
+        await supabase.functions.invoke('send-handshake-notification', {
+          body: {
+            type: 'handshake_approved',
+            handshakeId: handshake.id,
+            recipientId: handshake.requester_id, // Pass user ID, email lookup done server-side
+            recipientName: handshake.requester.full_name,
+            data: {
+              amount: handshake.amount,
+              supporterName: handshake.supporter.full_name,
+              paybackDate: handshake.payback_day,
             }
-          });
-        } catch (emailError) {
-          console.error('Email notification failed:', emailError);
-        }
+          }
+        });
+      } catch (emailError) {
+        console.error('Email notification failed:', emailError);
       }
 
       toast.success("Payment completed! Handshake approved!");
