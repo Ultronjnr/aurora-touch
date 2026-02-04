@@ -22,6 +22,7 @@ const KYCOnboarding = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   
   // Auto-filled from auth
   const [email, setEmail] = useState("");
@@ -43,28 +44,34 @@ const KYCOnboarding = () => {
 
     // Fetch profile and role data
     const fetchUserData = async () => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
-      const { data: userRole } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .single();
+        const { data: userRole } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-      if (profile) {
-        setEmail(user.email || "");
-        setFullName(profile.full_name || "");
-        setPhone(profile.phone || "");
-        setRole(userRole?.role || "");
+        if (profile) {
+          setEmail(user.email || "");
+          setFullName(profile.full_name || "");
+          setPhone(profile.phone || "");
+          setRole(userRole?.role || "");
 
-        // If KYC already completed, redirect to dashboard
-        if (profile.kyc_completed) {
-          navigate("/dashboard");
+          // If KYC already completed, redirect to dashboard
+          if (profile.kyc_completed) {
+            navigate("/dashboard");
+          }
         }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
+        setInitialLoading(false);
       }
     };
 
@@ -241,6 +248,14 @@ const KYCOnboarding = () => {
       navigate("/dashboard");
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-foreground/60">Loading your profile...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
