@@ -162,17 +162,72 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { type, recipientEmail: providedEmail, recipientId, recipientName, recipientPhone, data }: NotificationRequest = await req.json();
+    // Validate authentication - require a valid auth token
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Missing authentication' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create client with user's auth token to validate identity
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Validate the JWT and get user
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !userData?.user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = userData.user.id;
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - No user ID in token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { type, recipientEmail: providedEmail, recipientId, recipientName, recipientPhone, data, handshakeId }: NotificationRequest & { handshakeId: string } = await req.json();
+
+    // Verify the authenticated user is involved in this handshake
+    const { data: handshake, error: handshakeError } = await supabaseClient
+      .from('handshakes')
+      .select('requester_id, supporter_id')
+      .eq('id', handshakeId)
+      .single();
+
+    if (handshakeError || !handshake) {
+      return new Response(
+        JSON.stringify({ error: 'Handshake not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Only allow users who are part of this handshake to send notifications
+    if (handshake.requester_id !== userId && handshake.supporter_id !== userId) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden - Not authorized for this handshake' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Use admin client for privileged operations (email lookup, etc.)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
     // Resolve recipient email - use provided email or look up from recipientId
     let recipientEmail = providedEmail;
     if (!recipientEmail && recipientId) {
-      // Use admin client to look up user email server-side
-      const supabaseAdmin = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
-      
       const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(recipientId);
       if (userError) {
         console.error("Error looking up user email:", userError);
@@ -182,7 +237,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    console.log("Sending notification:", { type, hasEmail: !!recipientEmail, recipientPhone: recipientPhone ? "****" + recipientPhone.slice(-4) : "none" });
+    console.log("Sending notification:", { type, handshakeId, callerUserId: userId, hasEmail: !!recipientEmail, recipientPhone: recipientPhone ? "****" + recipientPhone.slice(-4) : "none" });
 
     let emailContent = {
       subject: "",
