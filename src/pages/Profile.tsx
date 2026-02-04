@@ -49,9 +49,11 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     try {
+      // Only fetch fields that are actually displayed on the profile page
+      // Excludes sensitive banking details (account_number, branch_code, id_document_url)
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('unique_code, full_name, phone, cash_rating, id_verified, kyc_completed, avatar_url')
         .eq('id', user?.id)
         .single();
 

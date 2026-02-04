@@ -40,6 +40,32 @@ const handler = async (req: Request): Promise<Response> => {
     });
   }
 
+  // Validate caller is authorized (cron secret or internal service call)
+  const authHeader = req.headers.get('Authorization');
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  
+  // Check for cron secret authentication (primary method for scheduled jobs)
+  let isAuthorized = false;
+  
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+    // Authorized via cron secret
+    isAuthorized = true;
+  } else if (authHeader?.startsWith('Bearer ')) {
+    // For internal edge function calls, check if the token is the service role key
+    const token = authHeader.replace('Bearer ', '');
+    if (token === supabaseServiceKey) {
+      isAuthorized = true;
+    }
+  }
+  
+  if (!isAuthorized) {
+    console.log("Unauthorized access attempt to check-payment-reminders");
+    return new Response(
+      JSON.stringify({ error: "Unauthorized - Admin access required" }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
