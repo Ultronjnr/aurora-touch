@@ -161,6 +161,38 @@ const KYCOnboarding = () => {
       return;
     }
 
+    // Validate account number format (5-20 digits)
+    const accountNumberClean = accountNumber.trim();
+    if (!/^\d{5,20}$/.test(accountNumberClean)) {
+      toast({
+        title: "Invalid account number",
+        description: "Account number must be 5-20 digits",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate branch code format (4-10 digits)
+    const branchCodeClean = branchCode.trim();
+    if (!/^\d{4,10}$/.test(branchCodeClean)) {
+      toast({
+        title: "Invalid branch code",
+        description: "Branch code must be 4-10 digits",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate account type
+    if (!['savings', 'current', 'cheque'].includes(accountType)) {
+      toast({
+        title: "Invalid account type",
+        description: "Please select a valid account type",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!idFile) {
       toast({
         title: "ID document required",
@@ -180,12 +212,12 @@ const KYCOnboarding = () => {
       return;
     }
 
-    // Update profile with all KYC data
+    // Update profile with all KYC data (using sanitized values)
     const { error } = await supabase
       .from("profiles")
       .update({
-        account_number: accountNumber,
-        branch_code: branchCode,
+        account_number: accountNumberClean,
+        branch_code: branchCodeClean,
         account_type: accountType,
         id_document_url: idDocumentUrl,
         kyc_completed: true,
