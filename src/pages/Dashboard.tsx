@@ -151,9 +151,9 @@ const Dashboard = () => {
   const activeHandshakes = handshakes.filter(h => ["pending", "approved", "active"].includes(h.status));
   const completedHandshakes = handshakes.filter(h => h.status === "completed");
   
-  // Separate handshakes by role
-  const borrowerHandshakes = activeHandshakes.filter(h => h.requester?.unique_code !== profile?.unique_code);
-  const lenderHandshakes = activeHandshakes.filter(h => h.supporter?.unique_code !== profile?.unique_code);
+  // Separate handshakes by role - borrower = where user is requester, lender = where user is supporter
+  const borrowerHandshakes = activeHandshakes.filter(h => h.requester?.unique_code === profile?.unique_code);
+  const lenderHandshakes = activeHandshakes.filter(h => h.supporter?.unique_code === profile?.unique_code);
 
   return (
     <div className="min-h-screen p-6 pb-24">

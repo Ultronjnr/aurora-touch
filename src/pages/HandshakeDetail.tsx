@@ -272,7 +272,20 @@ const HandshakeDetail = () => {
   }
 
   if (!handshake) {
-    return null;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <GlassCard className="text-center py-12 max-w-md">
+          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-destructive" />
+          <h2 className="text-xl font-semibold mb-2">Handshake Not Found</h2>
+          <p className="text-foreground/60 mb-6">
+            This handshake may have been deleted or you don't have permission to view it.
+          </p>
+          <Button onClick={() => navigate("/dashboard")} className="bg-gradient-to-r from-primary to-secondary">
+            Return to Dashboard
+          </Button>
+        </GlassCard>
+      </div>
+    );
   }
 
   const paybackDate = new Date(handshake.payback_day);
