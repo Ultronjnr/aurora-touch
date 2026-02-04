@@ -288,6 +288,18 @@ export type Database = {
         Args: { handshake_id: string }
         Returns: number
       }
+      get_safe_profile: {
+        Args: { profile_id: string }
+        Returns: {
+          avatar_url: string
+          cash_rating: number
+          full_name: string
+          id: string
+          id_verified: boolean
+          kyc_completed: boolean
+          unique_code: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
