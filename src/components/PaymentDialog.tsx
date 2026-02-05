@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { DollarSign } from "lucide-react";
+import { DollarSign, Loader2, ExternalLink } from "lucide-react";
 import { validateAmount } from "@/lib/validation";
 
 interface PaymentDialogProps {
@@ -42,32 +42,41 @@ export const PaymentDialog = ({
     setLoading(true);
 
     try {
-      // Record the payment
-      const { error } = await supabase
-        .from('payments')
-        .insert({
-          handshake_id: handshakeId,
+      // Get the base URL for return/cancel URLs
+      const baseUrl = window.location.origin;
+      
+      // Call the PayFast edge function
+      const { data, error } = await supabase.functions.invoke('create-payfast-payment', {
+        body: {
           amount: paymentAmount,
-          payment_status: 'completed',
-          payment_method: 'eft', // Valid payment method for database constraint
-          transaction_reference: `PAY-${Date.now()}`,
-        });
+          itemName: `Handshake Repayment`,
+          handshakeId: handshakeId,
+          returnUrl: `${baseUrl}/payment/success`,
+          cancelUrl: `${baseUrl}/payment/cancel?handshake_id=${handshakeId}`,
+          notifyUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/handle-payfast-itn`,
+        }
+      });
 
       if (error) throw error;
 
-      toast.success("Payment recorded successfully!", {
-        description: `Paid R ${paymentAmount.toFixed(2)}`,
-      });
-
-      setAmount("");
-      onOpenChange(false);
-      onPaymentSuccess();
+      if (data?.redirectUrl) {
+        toast.success("Redirecting to PayFast...", {
+          description: "Complete your payment securely",
+        });
+        
+        // Redirect to PayFast
+        window.location.href = data.redirectUrl;
+      } else {
+        throw new Error("No redirect URL received");
+      }
     } catch (error: any) {
-      toast.error("Error recording payment", {
-        description: error.message,
+      console.error("Payment error:", error);
+      toast.error("Error initiating payment", {
+        description: error.message || "Please try again",
       });
-    } finally {
       setLoading(false);
+    } finally {
+      // Don't set loading to false here since we're redirecting
     }
   };
 
@@ -182,13 +191,23 @@ export const PaymentDialog = ({
               disabled={loading || !amount || parseFloat(amount) <= 0}
               className="flex-1 bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white"
             >
-              {loading ? "Processing..." : "Pay Now"}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Pay with PayFast
+                </>
+              )}
             </Button>
           </div>
 
           <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
             <p className="text-xs text-foreground/60">
-              💡 You can make multiple partial payments until the full amount is paid.
+              💡 You'll be redirected to PayFast to complete your payment securely.
             </p>
           </div>
         </div>

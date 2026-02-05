@@ -607,6 +607,7 @@ const HandshakeDetail = () => {
         amount={handshake.amount}
         transactionFee={handshake.transaction_fee}
         recipientName={handshake.requester.full_name}
+        handshakeId={handshake.id}
       />
     </div>
   );
