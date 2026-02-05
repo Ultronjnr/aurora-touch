@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CreditCard, Wallet, CheckCircle2, Loader2 } from "lucide-react";
+import { Shield, Loader2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PaymentSimulationDialogProps {
   open: boolean;
@@ -14,6 +12,7 @@ interface PaymentSimulationDialogProps {
   amount: number;
   transactionFee: number;
   recipientName: string;
+  handshakeId: string;
 }
 
 export const PaymentSimulationDialog = ({ 
@@ -22,40 +21,51 @@ export const PaymentSimulationDialog = ({
   onSuccess, 
   amount,
   transactionFee,
-  recipientName 
+  recipientName,
+  handshakeId
 }: PaymentSimulationDialogProps) => {
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'eft' | 'wallet'>('card');
   const [processing, setProcessing] = useState(false);
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [cvv, setCvv] = useState("");
 
   const totalAmount = amount + transactionFee;
 
   const handlePayment = async () => {
-    // Validate based on payment method
-    if (paymentMethod === 'card') {
-      if (!cardNumber || cardNumber.length < 16) {
-        toast.error("Please enter a valid card number");
-        return;
-      }
-      if (!expiryDate || !cvv) {
-        toast.error("Please complete all card details");
-        return;
-      }
-    }
-
     setProcessing(true);
 
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // Get the base URL for return/cancel URLs
+      const baseUrl = window.location.origin;
+      
+      // Call the PayFast edge function
+      const { data, error } = await supabase.functions.invoke('create-payfast-payment', {
+        body: {
+          amount: totalAmount,
+          itemName: `CashMe Support to ${recipientName}`,
+          handshakeId: handshakeId,
+          returnUrl: `${baseUrl}/payment/success`,
+          cancelUrl: `${baseUrl}/payment/cancel?handshake_id=${handshakeId}`,
+          notifyUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/handle-payfast-itn`,
+        }
+      });
 
-    toast.success("Payment processed successfully!", {
-      description: `R ${totalAmount.toFixed(2)} sent to ${recipientName}`,
-    });
+      if (error) throw error;
 
-    onSuccess();
-    setProcessing(false);
+      if (data?.redirectUrl) {
+        toast.success("Redirecting to PayFast...", {
+          description: "Complete your payment securely",
+        });
+        
+        // Redirect to PayFast
+        window.location.href = data.redirectUrl;
+      } else {
+        throw new Error("No redirect URL received");
+      }
+    } catch (error: any) {
+      console.error("Payment error:", error);
+      toast.error("Error initiating payment", {
+        description: error.message || "Please try again",
+      });
+      setProcessing(false);
+    }
   };
 
   return (
@@ -64,7 +74,7 @@ export const PaymentSimulationDialog = ({
         <DialogHeader>
           <DialogTitle>Complete Payment</DialogTitle>
           <DialogDescription>
-            Test Mode: No real payment will be processed
+            You'll be redirected to PayFast to complete your payment securely
           </DialogDescription>
         </DialogHeader>
 
@@ -77,7 +87,7 @@ export const PaymentSimulationDialog = ({
                 <span className="font-medium">R {amount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-foreground/60">Platform Fee (5%)</span>
+                <span className="text-foreground/60">Platform Fee (4.5%)</span>
                 <span className="font-medium">R {transactionFee.toFixed(2)}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-border/30">
@@ -87,99 +97,22 @@ export const PaymentSimulationDialog = ({
             </div>
           </div>
 
-          {/* Payment Method Selection */}
-          <div className="space-y-3">
-            <Label>Payment Method</Label>
-            <RadioGroup value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as any)}>
-              <div className="flex items-center space-x-2 p-3 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/50">
-                <RadioGroupItem value="card" id="card" />
-                <Label htmlFor="card" className="cursor-pointer font-normal flex items-center gap-2 flex-1">
-                  <CreditCard className="w-4 h-4" />
-                  Card Payment
-                </Label>
+          {/* Security Notice */}
+          <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
+            <div className="flex items-center gap-3">
+              <Shield className="w-8 h-8 text-primary" />
+              <div>
+                <p className="font-medium text-sm">Secure Payment</p>
+                <p className="text-xs text-foreground/60">
+                  Your payment is processed securely by PayFast
+                </p>
               </div>
-              <div className="flex items-center space-x-2 p-3 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/50">
-                <RadioGroupItem value="eft" id="eft" />
-                <Label htmlFor="eft" className="cursor-pointer font-normal flex items-center gap-2 flex-1">
-                  <Wallet className="w-4 h-4" />
-                  Instant EFT
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2 p-3 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/50">
-                <RadioGroupItem value="wallet" id="wallet" />
-                <Label htmlFor="wallet" className="cursor-pointer font-normal flex items-center gap-2 flex-1">
-                  <Wallet className="w-4 h-4" />
-                  Mobile Wallet
-                </Label>
-              </div>
-            </RadioGroup>
+            </div>
           </div>
 
-          {/* Card Details Form (only for card payment) */}
-          {paymentMethod === 'card' && (
-            <div className="space-y-4 animate-slide-down">
-              <div className="space-y-2">
-                <Label htmlFor="card-number">Card Number</Label>
-                <Input
-                  id="card-number"
-                  type="text"
-                  maxLength={16}
-                  placeholder="1234 5678 9012 3456"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value.replace(/\s/g, ''))}
-                  className="bg-input/50 border-border/50 font-mono"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="expiry">Expiry Date</Label>
-                  <Input
-                    id="expiry"
-                    type="text"
-                    maxLength={5}
-                    placeholder="MM/YY"
-                    value={expiryDate}
-                    onChange={(e) => setExpiryDate(e.target.value)}
-                    className="bg-input/50 border-border/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cvv">CVV</Label>
-                  <Input
-                    id="cvv"
-                    type="password"
-                    maxLength={3}
-                    placeholder="123"
-                    value={cvv}
-                    onChange={(e) => setCvv(e.target.value)}
-                    className="bg-input/50 border-border/50"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* EFT/Wallet Instructions */}
-          {(paymentMethod === 'eft' || paymentMethod === 'wallet') && (
-            <div className="p-4 rounded-lg bg-muted/20 border border-border/30 animate-slide-down">
-              <p className="text-sm text-foreground/70">
-                {paymentMethod === 'eft' 
-                  ? "In production, you would be redirected to your bank's secure EFT portal."
-                  : "In production, you would select your mobile wallet provider and authorize the payment."}
-              </p>
-            </div>
-          )}
-
-          {/* Test Mode Notice */}
-          <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-            <div className="flex items-center gap-2 text-yellow-500 text-sm">
-              <CheckCircle2 className="w-4 h-4" />
-              <span className="font-medium">Test Mode Active</span>
-            </div>
-            <p className="text-xs text-foreground/60 mt-1">
-              This is a simulation. No actual payment will be processed.
-            </p>
-          </div>
+          <p className="text-xs text-foreground/60 text-center">
+            This payment supports {recipientName}'s request
+          </p>
         </div>
 
         <div className="flex gap-3">
@@ -188,17 +121,18 @@ export const PaymentSimulationDialog = ({
           </Button>
           <Button 
             onClick={handlePayment}
-            className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:opacity-90 text-white"
+            className="flex-1 bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white"
             disabled={processing}
           >
             {processing ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing...
+                Redirecting...
               </>
             ) : (
               <>
-                Pay R {totalAmount.toFixed(2)}
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Pay with PayFast
               </>
             )}
           </Button>
