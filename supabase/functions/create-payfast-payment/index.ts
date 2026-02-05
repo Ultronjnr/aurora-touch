@@ -18,6 +18,57 @@ interface PaymentRequest {
   notifyUrl: string;
 }
 
+// UUID validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Input validation
+function validatePaymentRequest(body: unknown): { valid: true; data: PaymentRequest } | { valid: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: "Invalid request body" };
+  }
+  
+  const { amount, itemName, handshakeId, returnUrl, cancelUrl, notifyUrl } = body as Record<string, unknown>;
+  
+  // Validate amount
+  if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0 || amount > 1000000) {
+    return { valid: false, error: "Invalid amount: must be a positive number up to 1,000,000" };
+  }
+  
+  // Validate handshakeId is a valid UUID
+  if (typeof handshakeId !== 'string' || !UUID_REGEX.test(handshakeId)) {
+    return { valid: false, error: "Invalid handshake ID format" };
+  }
+  
+  // Validate itemName
+  if (typeof itemName !== 'string' || itemName.length === 0 || itemName.length > 100) {
+    return { valid: false, error: "Invalid item name" };
+  }
+  
+  // Validate URLs
+  const urlPattern = /^https?:\/\/.+/;
+  if (typeof returnUrl !== 'string' || !urlPattern.test(returnUrl)) {
+    return { valid: false, error: "Invalid return URL" };
+  }
+  if (typeof cancelUrl !== 'string' || !urlPattern.test(cancelUrl)) {
+    return { valid: false, error: "Invalid cancel URL" };
+  }
+  if (typeof notifyUrl !== 'string' || !urlPattern.test(notifyUrl)) {
+    return { valid: false, error: "Invalid notify URL" };
+  }
+  
+  return {
+    valid: true,
+    data: {
+      amount: Math.round(amount * 100) / 100, // Round to 2 decimal places
+      itemName: itemName.substring(0, 100).replace(/[<>]/g, ''), // Sanitize
+      handshakeId,
+      returnUrl,
+      cancelUrl,
+      notifyUrl,
+    }
+  };
+}
+
 function generateSignature(data: Record<string, string>, passphrase: string): string {
   // Create parameter string (alphabetically sorted, URL encoded)
   const paramString = Object.keys(data)
@@ -233,17 +284,18 @@ Deno.serve(async (req) => {
 
     const userId = claimsData.user.id;
 
-    // Parse request body
-    const body: PaymentRequest = await req.json();
-    const { amount, itemName, handshakeId, returnUrl, cancelUrl, notifyUrl } = body;
-
-    // Validate input
-    if (!amount || !itemName || !handshakeId || !returnUrl || !cancelUrl || !notifyUrl) {
+    // Parse and validate request body
+    const rawBody = await req.json();
+    const validation = validatePaymentRequest(rawBody);
+    
+    if (!validation.valid) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: validation.error }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const { amount, itemName, handshakeId, returnUrl, cancelUrl, notifyUrl } = validation.data;
 
     // Verify user is part of the handshake
     const { data: handshake, error: handshakeError } = await supabase
@@ -272,7 +324,6 @@ Deno.serve(async (req) => {
     const passphrase = Deno.env.get("PAYFAST_PASSPHRASE");
 
     if (!merchantId || !merchantKey || !passphrase) {
-      console.error("PayFast credentials not configured");
       return new Response(
         JSON.stringify({ error: "Payment configuration error" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -293,7 +344,6 @@ Deno.serve(async (req) => {
     });
 
     if (paymentError) {
-      console.error("Failed to create payment record:", paymentError);
       return new Response(
         JSON.stringify({ error: "Failed to initiate payment" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -335,7 +385,6 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error creating PayFast payment:", error);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

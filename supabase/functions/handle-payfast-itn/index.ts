@@ -21,6 +21,9 @@ const PAYFAST_IPS = [
   "41.74.179.197",
 ];
 
+// UUID validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function generateSignature(data: Record<string, string>, passphrase: string): string {
   const paramString = Object.keys(data)
     .sort()
@@ -240,20 +243,16 @@ Deno.serve(async (req) => {
       data[key] = value.toString();
     }
 
-    console.log("ITN received:", JSON.stringify(data));
-
     // Get PayFast passphrase
     const passphrase = Deno.env.get("PAYFAST_PASSPHRASE");
     const merchantId = Deno.env.get("PAYFAST_MERCHANT_ID");
 
     if (!passphrase || !merchantId) {
-      console.error("PayFast credentials not configured");
       return new Response("Configuration error", { status: 500 });
     }
 
     // Verify merchant ID
     if (data.merchant_id !== merchantId) {
-      console.error("Merchant ID mismatch");
       return new Response("Invalid merchant", { status: 400 });
     }
 
@@ -262,7 +261,6 @@ Deno.serve(async (req) => {
     const calculatedSignature = generateSignature(data, passphrase);
 
     if (receivedSignature !== calculatedSignature) {
-      console.error("Signature mismatch", { received: receivedSignature, calculated: calculatedSignature });
       return new Response("Invalid signature", { status: 400 });
     }
 
@@ -274,7 +272,6 @@ Deno.serve(async (req) => {
 
     const isValid = await validateWithPayFast(paramString);
     if (!isValid) {
-      console.error("PayFast server validation failed");
       return new Response("Validation failed", { status: 400 });
     }
 
@@ -290,6 +287,37 @@ Deno.serve(async (req) => {
     const pfPaymentId = data.pf_payment_id;
     const amountGross = parseFloat(data.amount_gross);
 
+    // Validate UUIDs to prevent injection
+    if (!UUID_REGEX.test(paymentId) || !UUID_REGEX.test(handshakeId)) {
+      return new Response("Invalid payment or handshake ID", { status: 400 });
+    }
+
+    // Validate amount is a positive number
+    if (isNaN(amountGross) || amountGross <= 0) {
+      return new Response("Invalid amount", { status: 400 });
+    }
+
+    // IDEMPOTENCY CHECK: First check if payment was already processed
+    const { data: existingPayment, error: checkError } = await supabase
+      .from("payments")
+      .select("payment_status, transaction_reference")
+      .eq("id", paymentId)
+      .single();
+
+    if (checkError) {
+      return new Response("Payment not found", { status: 404 });
+    }
+
+    // If already completed with same reference, return success (idempotent)
+    if (existingPayment.payment_status === "completed" && existingPayment.transaction_reference === pfPaymentId) {
+      return new Response("OK", { status: 200 });
+    }
+
+    // If already completed with different reference, reject (duplicate attempt)
+    if (existingPayment.payment_status === "completed") {
+      return new Response("Payment already processed", { status: 400 });
+    }
+
     // Update payment record
     const { error: paymentUpdateError } = await supabase
       .from("payments")
@@ -297,38 +325,44 @@ Deno.serve(async (req) => {
         payment_status: paymentStatus === "COMPLETE" ? "completed" : "failed",
         transaction_reference: pfPaymentId,
       })
-      .eq("id", paymentId);
+      .eq("id", paymentId)
+      .eq("payment_status", "pending"); // Only update if still pending (idempotency)
 
     if (paymentUpdateError) {
-      console.error("Failed to update payment:", paymentUpdateError);
       return new Response("Database error", { status: 500 });
     }
 
-    // If payment is complete, update handshake
+    // ONLY update handshake if payment is COMPLETE (not for failed payments)
     if (paymentStatus === "COMPLETE") {
       // Get current handshake to calculate new amount_paid
       const { data: handshake, error: handshakeError } = await supabase
         .from("handshakes")
-        .select("amount_paid, amount, transaction_fee, late_fee")
+        .select("amount_paid, amount, transaction_fee, late_fee, status")
         .eq("id", handshakeId)
         .single();
 
       if (handshakeError) {
-        console.error("Failed to fetch handshake:", handshakeError);
         return new Response("Database error", { status: 500 });
+      }
+
+      // Don't update already completed handshakes
+      if (handshake.status === "completed") {
+        return new Response("OK", { status: 200 });
       }
 
       const currentPaid = handshake.amount_paid || 0;
       const newAmountPaid = currentPaid + amountGross;
       const totalDue = handshake.amount + (handshake.transaction_fee || 0) + (handshake.late_fee || 0);
 
-      // Determine new status
-      let newStatus = "active";
+      // Determine new status - only activate if currently pending/approved
+      let newStatus = handshake.status;
       let completedAt = null;
 
       if (newAmountPaid >= totalDue) {
         newStatus = "completed";
         completedAt = new Date().toISOString();
+      } else if (handshake.status === "pending" || handshake.status === "approved") {
+        newStatus = "active";
       }
 
       // Update handshake
@@ -344,17 +378,13 @@ Deno.serve(async (req) => {
         .eq("id", handshakeId);
 
       if (updateError) {
-        console.error("Failed to update handshake:", updateError);
         return new Response("Database error", { status: 500 });
       }
-
-      console.log(`Payment ${paymentId} completed for handshake ${handshakeId}. Amount: ${amountGross}`);
     }
 
     // Return 200 OK to PayFast
     return new Response("OK", { status: 200 });
   } catch (error) {
-    console.error("ITN processing error:", error);
     return new Response("Internal error", { status: 500 });
   }
 });
