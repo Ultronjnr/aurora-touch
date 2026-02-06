@@ -275,7 +275,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                   <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px;">Amount Requested</p>
                   <p style="margin: 5px 0; color: #0ea5e9; font-size: 32px; font-weight: bold;">R ${data.amount?.toFixed(2)}</p>
-                  <p style="margin: 10px 0 5px 0; color: #6b7280; font-size: 13px;">Transaction Fee (5%): R ${data.transactionFee?.toFixed(2)}</p>
+                  <p style="margin: 10px 0 5px 0; color: #6b7280; font-size: 13px;">Transaction Fee (4.5%): R ${data.transactionFee?.toFixed(2)}</p>
                   <div style="border-top: 2px solid #e5e7eb; margin: 10px 0; padding-top: 10px;">
                     <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: bold;">Total to Receive: R ${totalAmountWithFee.toFixed(2)}</p>
                   </div>
@@ -291,7 +291,7 @@ const handler = async (req: Request): Promise<Response> => {
                 
                 <div style="background: #dbeafe; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0; border-radius: 4px;">
                   <p style="margin: 0; color: #075985; font-size: 13px;">
-                    <strong>Note:</strong> CashMe operates on a pay-as-you-go model. A 5% transaction fee is applied to all handshakes.
+                    <strong>Note:</strong> CashMe operates on a pay-as-you-go model. A 4.5% transaction fee is applied to all handshakes.
                   </p>
                 </div>
                 
