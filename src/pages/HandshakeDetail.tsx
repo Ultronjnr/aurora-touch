@@ -142,53 +142,14 @@ const HandshakeDetail = () => {
   };
 
   const handlePaymentSuccess = async () => {
-    if (!handshake) return;
-
+    // PayFast redirect handles the actual payment.
+    // ITN webhook will update handshake status server-side.
+    // This callback is only used when the PaymentSimulationDialog
+    // successfully redirects to PayFast — the status update happens
+    // via the ITN handler, not client-side.
     setPaymentSimDialogOpen(false);
-    setActionLoading(true);
-
-    try {
-      // Update handshake with payment completion
-      const { error: updateError } = await supabase
-        .from('handshakes')
-        .update({ 
-          status: 'approved',
-          payment_status: 'completed',
-          payment_initiated_at: new Date().toISOString(),
-          payment_completed_at: new Date().toISOString(),
-        })
-        .eq('id', handshake.id);
-
-      if (updateError) throw updateError;
-
-      // Send notification - email lookup handled server-side in Edge Function
-      try {
-        await supabase.functions.invoke('send-handshake-notification', {
-          body: {
-            type: 'handshake_approved',
-            handshakeId: handshake.id,
-            recipientId: handshake.requester_id, // Pass user ID, email lookup done server-side
-            recipientName: handshake.requester.full_name,
-            data: {
-              amount: handshake.amount,
-              supporterName: handshake.supporter.full_name,
-              paybackDate: handshake.payback_day,
-            }
-          }
-        });
-      } catch (emailError) {
-        console.error('Email notification failed:', emailError);
-      }
-
-      toast.success("Payment completed! Handshake approved!");
-      fetchHandshake();
-    } catch (error: any) {
-      toast.error("Error completing payment", {
-        description: error.message,
-      });
-    } finally {
-      setActionLoading(false);
-    }
+    toast.info("Payment initiated — status will update once confirmed by PayFast.");
+    fetchHandshake();
   };
 
   const handleReject = async () => {
