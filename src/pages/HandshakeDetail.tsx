@@ -109,10 +109,11 @@ const HandshakeDetail = () => {
     setActionLoading(true);
 
     try {
-      // Update handshake with penalty terms
+      // Update handshake with penalty terms and set status to approved
       const { error: updateError } = await supabase
         .from('handshakes')
         .update({ 
+          status: 'pending', // Stay pending until payment — status transitions via ITN
           penalty_enabled: penalty.enabled,
           penalty_type: penalty.type,
           penalty_amount: penalty.amount,

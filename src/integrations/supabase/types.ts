@@ -307,6 +307,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      search_profiles: {
+        Args: { search_term: string }
+        Returns: {
+          avatar_url: string
+          cash_rating: number
+          full_name: string
+          id: string
+          id_verified: boolean
+          kyc_completed: boolean
+          unique_code: string
+        }[]
+      }
       update_cash_rating: {
         Args: { days_late: number; user_id: string }
         Returns: number

@@ -52,17 +52,18 @@ const CreateHandshake = () => {
 
   const searchSupporters = async () => {
     try {
-      // Only fetch non-sensitive fields for search - no banking details
+      // Use secure search function that only returns safe profile fields
+      // This prevents exposure of banking details via the search endpoint
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, unique_code, full_name, cash_rating')
-        .neq('id', user?.id)
-        .eq('kyc_completed', true) // Only show verified users
-        .or(`unique_code.ilike.%${supporterSearch}%,full_name.ilike.%${supporterSearch}%`)
-        .limit(5);
+        .rpc('search_profiles', { search_term: supporterSearch });
 
       if (error) throw error;
-      setProfiles(data || []);
+      setProfiles((data || []).map((p: any) => ({
+        id: p.id,
+        unique_code: p.unique_code,
+        full_name: p.full_name,
+        cash_rating: p.cash_rating,
+      })));
     } catch (error: any) {
       console.error("Error searching supporters");
     }
