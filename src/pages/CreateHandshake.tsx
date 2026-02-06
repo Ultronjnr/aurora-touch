@@ -94,8 +94,8 @@ const CreateHandshake = () => {
     setLoading(true);
 
     try {
-      // Calculate 5% transaction fee using validated amount
-      const transactionFee = validatedAmount * 0.05;
+      // Calculate 4.5% transaction fee using validated amount
+      const transactionFee = Math.round(validatedAmount * 0.045 * 100) / 100;
       
       // Create handshake - supporter will set penalty terms during approval
       const { data: handshakeData, error: handshakeError } = await supabase
@@ -341,12 +341,12 @@ const CreateHandshake = () => {
                   <span className="font-semibold">R {parseFloat(amount).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-foreground/80">Transaction Fee (5%):</span>
-                  <span className="font-semibold text-secondary">R {(parseFloat(amount) * 0.05).toFixed(2)}</span>
+                  <span className="text-foreground/80">Platform Fee (4.5%):</span>
+                  <span className="font-semibold text-secondary">R {(Math.round(parseFloat(amount) * 0.045 * 100) / 100).toFixed(2)}</span>
                 </div>
                 <div className="border-t border-border/30 pt-2 mt-2 flex justify-between items-center">
                   <span className="font-semibold">Total to Repay:</span>
-                  <span className="font-bold text-lg gradient-text">R {(parseFloat(amount) + parseFloat(amount) * 0.05).toFixed(2)}</span>
+                  <span className="font-bold text-lg gradient-text">R {(parseFloat(amount) + Math.round(parseFloat(amount) * 0.045 * 100) / 100).toFixed(2)}</span>
                 </div>
               </div>
             )}
