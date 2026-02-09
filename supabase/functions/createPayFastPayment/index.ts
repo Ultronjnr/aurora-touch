@@ -340,7 +340,7 @@ Deno.serve(async (req) => {
       id: paymentId,
       handshake_id,
       amount: chargeAmount,
-      payment_method: "payfast",
+      payment_method: "card",
       payment_status: "pending",
       transaction_reference: null,
     });
