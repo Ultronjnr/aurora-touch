@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.createPayFastPayment]
 verify_jwt = false
+
+[functions.repayHandshake]
+verify_jwt = false
