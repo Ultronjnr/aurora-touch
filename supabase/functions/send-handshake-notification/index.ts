@@ -24,7 +24,7 @@ const getCorsHeaders = (origin: string | null): Record<string, string> => {
   
   return {
     'Access-Control-Allow-Origin': isAllowed ? origin! : allowedOrigins[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
   };
@@ -179,8 +179,10 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     // Validate the JWT and get user
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+    const token = authHeader.replace('Bearer ', '');
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     if (userError || !userData?.user) {
+      console.error("Auth error:", userError?.message);
       return new Response(
         JSON.stringify({ error: 'Unauthorized - Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
