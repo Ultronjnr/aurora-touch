@@ -7,7 +7,7 @@ verify_jwt = false
 verify_jwt = false
 
 
-[functions.handle-payfast-itn]
+[functions.payfastITN]
 verify_jwt = false
 
 [functions.createPayFastPayment]

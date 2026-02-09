@@ -327,7 +327,7 @@ Deno.serve(async (req) => {
 
     // ---- Build URLs ----
     // App URL derived from the Supabase URL project ref for the notify callback
-    const notifyUrl = `${supabaseUrl}/functions/v1/handle-payfast-itn`;
+    const notifyUrl = `${supabaseUrl}/functions/v1/payfastITN`;
     // Use the published app URL for return / cancel
     const appUrl = "https://cashmeza.lovable.app";
     const returnUrl = `${appUrl}/payment-success`;
