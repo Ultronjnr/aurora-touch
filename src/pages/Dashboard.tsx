@@ -13,7 +13,8 @@ import {
   Clock, 
   AlertCircle,
   Wallet,
-  HandshakeIcon
+  HandshakeIcon,
+  CreditCard
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +27,7 @@ import { IncomingHandshakeRequests } from "@/components/IncomingHandshakeRequest
 import { ExpectedIncomeTracker } from "@/components/ExpectedIncomeTracker";
 import { LendingAnalytics } from "@/components/LendingAnalytics";
 import { NotificationBell } from "@/components/NotificationBell";
+import { PayFastCheckoutDialog } from "@/components/PayFastCheckoutDialog";
 
 interface Profile {
   unique_code: string;
@@ -50,6 +52,7 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [handshakes, setHandshakes] = useState<Handshake[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCheckout, setShowCheckout] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -367,13 +370,32 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Floating Action Button */}
-      <Button
-        onClick={() => navigate("/create-handshake")}
-        className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-2xl hover:scale-110 transition-all duration-300 glow-cyan"
-      >
-        <Plus className="w-8 h-8" />
-      </Button>
+      {/* PayFast Checkout Dialog */}
+      <PayFastCheckoutDialog
+        open={showCheckout}
+        onOpenChange={setShowCheckout}
+        nameFirst={profile?.full_name?.split(" ")[0] || ""}
+        nameLast={profile?.full_name?.split(" ").slice(1).join(" ") || ""}
+        email={user?.email || ""}
+        customStr1={user?.id}
+      />
+
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-8 right-8 flex flex-col gap-3 items-center">
+        <Button
+          onClick={() => setShowCheckout(true)}
+          className="w-14 h-14 rounded-full bg-secondary hover:bg-secondary/90 shadow-2xl"
+          title="Pay with PayFast"
+        >
+          <CreditCard className="w-6 h-6" />
+        </Button>
+        <Button
+          onClick={() => navigate("/create-handshake")}
+          className="w-16 h-16 rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-2xl hover:scale-110 transition-all duration-300 glow-cyan"
+        >
+          <Plus className="w-8 h-8" />
+        </Button>
+      </div>
     </div>
   );
 };
