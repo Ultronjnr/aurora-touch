@@ -162,8 +162,10 @@ export type Database = {
         Row: {
           amount: number
           created_at: string | null
+          fee: number | null
           handshake_id: string
           id: string
+          net_amount: number | null
           payment_method: string | null
           payment_status: string | null
           transaction_reference: string | null
@@ -171,8 +173,10 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string | null
+          fee?: number | null
           handshake_id: string
           id?: string
+          net_amount?: number | null
           payment_method?: string | null
           payment_status?: string | null
           transaction_reference?: string | null
@@ -180,8 +184,10 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string | null
+          fee?: number | null
           handshake_id?: string
           id?: string
+          net_amount?: number | null
           payment_method?: string | null
           payment_status?: string | null
           transaction_reference?: string | null
