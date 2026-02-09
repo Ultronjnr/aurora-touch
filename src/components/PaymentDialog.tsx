@@ -45,13 +45,12 @@ export const PaymentDialog = ({
     try {
       const baseUrl = window.location.origin;
       
-      // Server calculates actual charge amount — we only send the requested repayment amount
-      const { data, error } = await supabase.functions.invoke('create-payfast-payment', {
+      // Server calculates actual charge amount — we send the requested repayment amount
+      const { data, error } = await supabase.functions.invoke('createPayFastPayment', {
         body: {
-          handshakeId,
-          paymentAmount,
-          returnUrl: `${baseUrl}/payment/success`,
-          cancelUrl: `${baseUrl}/payment/cancel?handshake_id=${handshakeId}`,
+          handshake_id: handshakeId,
+          supporter_id: '', // Validated server-side from handshake
+          amount: paymentAmount,
         }
       });
 

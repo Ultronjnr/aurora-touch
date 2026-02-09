@@ -35,11 +35,11 @@ export const PaymentSimulationDialog = ({
       const baseUrl = window.location.origin;
       
       // Server calculates actual charge — we only send handshakeId
-      const { data, error } = await supabase.functions.invoke('create-payfast-payment', {
+      const { data, error } = await supabase.functions.invoke('createPayFastPayment', {
         body: {
-          handshakeId,
-          returnUrl: `${baseUrl}/payment/success`,
-          cancelUrl: `${baseUrl}/payment/cancel?handshake_id=${handshakeId}`,
+          handshake_id: handshakeId,
+          supporter_id: '', // Will be validated server-side from handshake data
+          amount: amount + transactionFee,
         }
       });
 
@@ -79,7 +79,7 @@ export const PaymentSimulationDialog = ({
               <span className="font-medium">R {amount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-foreground/60">Platform Fee (4.5%)</span>
+              <span className="text-foreground/60">Platform Fee (3.5%)</span>
               <span className="font-medium text-secondary">R {transactionFee.toFixed(2)}</span>
             </div>
             <div className="flex justify-between pt-3 border-t border-border/30">

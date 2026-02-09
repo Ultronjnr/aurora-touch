@@ -6,8 +6,6 @@ verify_jwt = false
 [functions.check-payment-reminders]
 verify_jwt = false
 
-[functions.create-payfast-payment]
-verify_jwt = false
 
 [functions.handle-payfast-itn]
 verify_jwt = false
