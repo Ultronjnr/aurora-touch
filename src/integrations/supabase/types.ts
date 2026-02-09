@@ -300,6 +300,18 @@ export type Database = {
           unique_code: string
         }[]
       }
+      get_safe_profiles_batch: {
+        Args: { profile_ids: string[] }
+        Returns: {
+          avatar_url: string
+          cash_rating: number
+          full_name: string
+          id: string
+          id_verified: boolean
+          kyc_completed: boolean
+          unique_code: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
