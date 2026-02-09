@@ -25,6 +25,7 @@ export type Database = {
           grace_period_days: number | null
           id: string
           late_fee: number | null
+          net_amount_received: number | null
           payback_day: string
           payment_completed_at: string | null
           payment_initiated_at: string | null
@@ -49,6 +50,7 @@ export type Database = {
           grace_period_days?: number | null
           id?: string
           late_fee?: number | null
+          net_amount_received?: number | null
           payback_day: string
           payment_completed_at?: string | null
           payment_initiated_at?: string | null
@@ -73,6 +75,7 @@ export type Database = {
           grace_period_days?: number | null
           id?: string
           late_fee?: number | null
+          net_amount_received?: number | null
           payback_day?: string
           payment_completed_at?: string | null
           payment_initiated_at?: string | null
@@ -195,6 +198,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "payments_handshake_id_fkey"
+            columns: ["handshake_id"]
+            isOneToOne: false
+            referencedRelation: "handshakes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_earnings: {
+        Row: {
+          created_at: string
+          fee_amount: number
+          handshake_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          fee_amount: number
+          handshake_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          fee_amount?: number
+          handshake_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_earnings_handshake_id_fkey"
             columns: ["handshake_id"]
             isOneToOne: false
             referencedRelation: "handshakes"

@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
       const { data: handshake, error: handshakeError } = await supabase
         .from("handshakes")
         .select(
-          "amount_paid, amount, transaction_fee, late_fee, status"
+          "amount_paid, amount, transaction_fee, late_fee, status, requester_id, payback_day, net_amount_received"
         )
         .eq("id", handshakeId)
         .single();
@@ -281,6 +281,10 @@ Deno.serve(async (req) => {
         (handshake.transaction_fee || 0) +
         (handshake.late_fee || 0);
 
+      // Calculate cumulative net_amount_received (amount minus 3.5% fee)
+      const currentNet = handshake.net_amount_received || 0;
+      const newNetAmountReceived = Math.round((currentNet + netAmount) * 100) / 100;
+
       // Determine new status
       let newStatus = handshake.status;
       let completedAt = null;
@@ -292,14 +296,15 @@ Deno.serve(async (req) => {
         handshake.status === "pending" ||
         handshake.status === "approved"
       ) {
-        // First payment transitions to active
         newStatus = "active";
       }
 
+      // Update handshake with net_amount_received
       const { error: updateError } = await supabase
         .from("handshakes")
         .update({
           amount_paid: newAmountPaid,
+          net_amount_received: newNetAmountReceived,
           status: newStatus,
           completed_at: completedAt,
           payment_status: "completed",
@@ -310,6 +315,64 @@ Deno.serve(async (req) => {
       if (updateError) {
         console.error("Handshake update error:", updateError);
         return new Response("Database error", { status: 500 });
+      }
+
+      // ---- Store platform earnings ----
+      const { error: earningsError } = await supabase
+        .from("platform_earnings")
+        .insert({
+          handshake_id: handshakeId,
+          fee_amount: platformFee,
+        });
+
+      if (earningsError) {
+        // Log but don't fail the ITN — payment is already processed
+        console.error("Platform earnings insert error:", earningsError);
+      }
+
+      // ---- Update requester cash_rating based on lateness ----
+      if (handshake.requester_id && handshake.payback_day) {
+        const paybackDate = new Date(handshake.payback_day);
+        const today = new Date();
+        const daysLate = Math.max(
+          0,
+          Math.floor(
+            (today.getTime() - paybackDate.getTime()) / (1000 * 60 * 60 * 24)
+          )
+        );
+
+        if (daysLate > 0) {
+          // Deduct 0.5 per day late, minimum rating 0
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("cash_rating")
+            .eq("id", handshake.requester_id)
+            .single();
+
+          if (profile) {
+            const currentRating = profile.cash_rating || 100;
+            const penalty = daysLate * 0.5;
+            const newRating = Math.max(0, currentRating - penalty);
+
+            await supabase
+              .from("profiles")
+              .update({
+                cash_rating: newRating,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", handshake.requester_id);
+
+            // Also update days_late on handshake
+            await supabase
+              .from("handshakes")
+              .update({ days_late: daysLate })
+              .eq("id", handshakeId);
+
+            console.log(
+              `Cash rating updated for ${handshake.requester_id}: ${currentRating} → ${newRating} (${daysLate} days late)`
+            );
+          }
+        }
       }
 
       console.log(
