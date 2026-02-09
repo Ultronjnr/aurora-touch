@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.handle-payfast-itn]
 verify_jwt = false
+
+[functions.createPayFastPayment]
+verify_jwt = false
