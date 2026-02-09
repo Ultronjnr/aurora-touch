@@ -15,6 +15,3 @@ verify_jwt = false
 
 [functions.repayHandshake]
 verify_jwt = false
-
-[functions.payfast-checkout]
-verify_jwt = false
