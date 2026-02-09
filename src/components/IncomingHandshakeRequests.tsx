@@ -56,24 +56,24 @@ export const IncomingHandshakeRequests = ({ userId }: { userId: string }) => {
     try {
       const { data, error } = await supabase
         .from('handshakes')
-        .select(`
-          id,
-          amount,
-          payback_day,
-          created_at,
-          penalty_enabled,
-          penalty_type,
-          penalty_amount,
-          grace_period_days,
-          transaction_fee,
-          requester:requester_id(full_name, unique_code, cash_rating)
-        `)
+        .select('id, amount, payback_day, created_at, penalty_enabled, penalty_type, penalty_amount, grace_period_days, transaction_fee, requester_id')
         .eq('supporter_id', userId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRequests(data as any || []);
+
+      // Fetch safe requester profiles in batch (no banking details exposed)
+      const requesterIds = [...new Set((data || []).map(h => h.requester_id))];
+      const { data: profiles } = await supabase.rpc('get_safe_profiles_batch', { profile_ids: requesterIds });
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+      const enriched = (data || []).map(h => ({
+        ...h,
+        requester: profileMap.get(h.requester_id) || { full_name: 'Unknown', unique_code: '', cash_rating: 0 },
+      }));
+
+      setRequests(enriched as any);
     } catch (error) {
       console.error('Error fetching requests:', error);
     } finally {

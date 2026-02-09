@@ -87,20 +87,24 @@ const Dashboard = () => {
     try {
       const { data, error } = await supabase
         .from('handshakes')
-        .select(`
-          id,
-          amount,
-          payback_day,
-          status,
-          auto_payback,
-          supporter:supporter_id(full_name, unique_code),
-          requester:requester_id(full_name, unique_code)
-        `)
+        .select('id, amount, payback_day, status, auto_payback, supporter_id, requester_id')
         .or(`requester_id.eq.${user?.id},supporter_id.eq.${user?.id}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setHandshakes(data as any || []);
+
+      // Fetch safe partner profiles in batch (no banking details exposed)
+      const profileIds = [...new Set((data || []).flatMap(h => [h.requester_id, h.supporter_id]))];
+      const { data: profiles } = await supabase.rpc('get_safe_profiles_batch', { profile_ids: profileIds });
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+      const enriched = (data || []).map(h => ({
+        ...h,
+        requester: profileMap.get(h.requester_id) || { full_name: 'Unknown', unique_code: '' },
+        supporter: profileMap.get(h.supporter_id) || { full_name: 'Unknown', unique_code: '' },
+      }));
+
+      setHandshakes(enriched as any);
     } catch (error: any) {
       toast.error("Error loading handshakes");
     } finally {

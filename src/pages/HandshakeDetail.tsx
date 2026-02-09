@@ -77,16 +77,23 @@ const HandshakeDetail = () => {
     try {
       const { data, error } = await supabase
         .from('handshakes')
-        .select(`
-          *,
-          requester:requester_id(full_name, unique_code),
-          supporter:supporter_id(full_name, unique_code)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
       if (error) throw error;
-      setHandshake(data as any);
+
+      // Fetch safe partner profiles (no banking details exposed)
+      const { data: profiles } = await supabase.rpc('get_safe_profiles_batch', {
+        profile_ids: [data.requester_id, data.supporter_id]
+      });
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+      setHandshake({
+        ...data,
+        requester: profileMap.get(data.requester_id) || { full_name: 'Unknown', unique_code: '' },
+        supporter: profileMap.get(data.supporter_id) || { full_name: 'Unknown', unique_code: '' },
+      } as any);
     } catch (error: any) {
       toast.error("Error loading handshake details");
       navigate("/dashboard");

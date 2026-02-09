@@ -39,23 +39,24 @@ export const UpcomingPayments = ({ userId }: { userId: string }) => {
     try {
       const { data, error } = await supabase
         .from('handshakes')
-        .select(`
-          id,
-          amount,
-          payback_day,
-          status,
-          amount_paid,
-          transaction_fee,
-          late_fee,
-          days_late,
-          supporter:supporter_id(full_name, unique_code)
-        `)
+        .select('id, amount, payback_day, status, amount_paid, transaction_fee, late_fee, days_late, supporter_id')
         .eq('requester_id', userId)
         .in('status', ['approved', 'active'])
         .order('payback_day', { ascending: true });
 
       if (error) throw error;
-      setPayments(data as any || []);
+
+      // Fetch safe supporter profiles in batch (no banking details exposed)
+      const supporterIds = [...new Set((data || []).map(h => h.supporter_id))];
+      const { data: profiles } = await supabase.rpc('get_safe_profiles_batch', { profile_ids: supporterIds });
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+      const enriched = (data || []).map(h => ({
+        ...h,
+        supporter: profileMap.get(h.supporter_id) || { full_name: 'Unknown', unique_code: '' },
+      }));
+
+      setPayments(enriched as any);
     } catch (error) {
       console.error('Error fetching upcoming payments:', error);
     } finally {
