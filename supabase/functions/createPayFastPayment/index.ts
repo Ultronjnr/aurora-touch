@@ -19,7 +19,7 @@ const UUID_REGEX =
 // --------------- Input validation ---------------
 interface PaymentInput {
   handshake_id: string;
-  supporter_id: string;
+  supporter_id?: string;
   amount: number;
 }
 
@@ -39,8 +39,11 @@ function validateInput(
     return { valid: false, error: "Invalid handshake_id format" };
   }
 
-  if (typeof supporter_id !== "string" || !UUID_REGEX.test(supporter_id)) {
-    return { valid: false, error: "Invalid supporter_id format" };
+  // supporter_id is optional — if provided, must be valid UUID
+  if (supporter_id !== undefined && supporter_id !== null && supporter_id !== '') {
+    if (typeof supporter_id !== "string" || !UUID_REGEX.test(supporter_id)) {
+      return { valid: false, error: "Invalid supporter_id format" };
+    }
   }
 
   if (
@@ -59,7 +62,7 @@ function validateInput(
     valid: true,
     data: {
       handshake_id,
-      supporter_id,
+      supporter_id: (typeof supporter_id === 'string' && supporter_id.length > 0) ? supporter_id : undefined,
       amount: Math.round(amount * 100) / 100,
     },
   };
@@ -270,8 +273,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify supporter_id matches the handshake's supporter
-    if (handshake.supporter_id !== supporter_id) {
+    // Verify supporter_id matches if provided
+    if (supporter_id && handshake.supporter_id !== supporter_id) {
       return new Response(
         JSON.stringify({ error: "supporter_id does not match the handshake supporter" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

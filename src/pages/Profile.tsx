@@ -185,7 +185,7 @@ const Profile = () => {
             <div className="flex-1">
               <div className="font-semibold text-lg mb-1">Pay-as-you-go</div>
               <div className="text-sm text-foreground/80">
-                4.5% transaction fee - only pay when you make handshakes
+                3.5% transaction fee - only pay when you make handshakes
               </div>
             </div>
           </div>

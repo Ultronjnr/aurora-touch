@@ -249,7 +249,7 @@ const Dashboard = () => {
                 <div className="flex-1">
                   <div className="font-semibold mb-1">Pay-as-you-go</div>
                   <div className="text-sm text-foreground/70">
-                    4.5% fee per transaction - only pay when you transact
+                    3.5% fee per transaction - only pay when you transact
                   </div>
                 </div>
               </div>
@@ -289,7 +289,7 @@ const Dashboard = () => {
                 <div className="flex-1">
                   <div className="font-semibold mb-1">Earn as you lend</div>
                   <div className="text-sm text-foreground/70">
-                    Requesters pay a 4.5% transaction fee on each loan
+                    Requesters pay a 3.5% transaction fee on each loan
                   </div>
                 </div>
               </div>
